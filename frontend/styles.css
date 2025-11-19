@@ -429,3 +429,88 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-secondary);
 }
+
+/* Git Modal Styles */
+.btn-git {
+    background-color: #6366f1;
+    color: white;
+}
+
+.btn-git:hover {
+    background-color: #4f46e5;
+}
+
+.git-modal-content {
+    max-width: 600px;
+}
+
+.git-modal-body {
+    padding: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+}
+
+.git-input {
+    width: 100%;
+    padding: 0.75rem;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-family: 'Courier New', monospace;
+    transition: border-color 0.2s;
+}
+
+.git-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.help-text {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.git-status-message {
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+    display: none;
+}
+
+.git-status-message:not(:empty) {
+    display: block;
+}
+
+.git-status-message.success {
+    background-color: rgba(22, 163, 74, 0.2);
+    border: 1px solid var(--success);
+    color: var(--success);
+}
+
+.git-status-message.error {
+    background-color: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+}
+
+.git-status-message.info {
+    background-color: rgba(37, 99, 235, 0.2);
+    border: 1px solid var(--primary);
+    color: #93c5fd;
+}

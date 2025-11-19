@@ -32,6 +32,15 @@ const elements = {
     comparisonSummary: null,
     loadingOverlay: null,
     workspaceInfo: null,
+    // Git modal elements
+    btnGit: null,
+    gitModal: null,
+    btnCloseGitModal: null,
+    btnCancelClone: null,
+    btnCloneRepo: null,
+    gitUrl: null,
+    folderName: null,
+    gitStatusMessage: null,
 };
 
 // Initialize application
@@ -55,6 +64,15 @@ function init() {
     elements.comparisonSummary = document.getElementById('comparison-summary');
     elements.loadingOverlay = document.getElementById('loading-overlay');
     elements.workspaceInfo = document.getElementById('workspace-info');
+    // Git modal elements
+    elements.btnGit = document.getElementById('btn-git');
+    elements.gitModal = document.getElementById('git-modal');
+    elements.btnCloseGitModal = document.getElementById('btn-close-git-modal');
+    elements.btnCancelClone = document.getElementById('btn-cancel-clone');
+    elements.btnCloneRepo = document.getElementById('btn-clone-repo');
+    elements.gitUrl = document.getElementById('git-url');
+    elements.folderName = document.getElementById('folder-name');
+    elements.gitStatusMessage = document.getElementById('git-status-message');
 
     // Initialize Monaco Editor
     initMonacoEditor();
@@ -94,6 +112,12 @@ function attachEventListeners() {
     elements.btnCloseModal.addEventListener('click', closeComparisonModal);
     elements.btnReject.addEventListener('click', closeComparisonModal);
     elements.btnApply.addEventListener('click', handleApplyChanges);
+
+    // Git modal event listeners
+    elements.btnGit.addEventListener('click', openGitModal);
+    elements.btnCloseGitModal.addEventListener('click', closeGitModal);
+    elements.btnCancelClone.addEventListener('click', closeGitModal);
+    elements.btnCloneRepo.addEventListener('click', handleCloneRepo);
 
     // Enter key in file path opens file
     elements.filePathInput.addEventListener('keypress', (e) => {
@@ -432,6 +456,93 @@ function hideLoading() {
 // Show error message
 function showError(message) {
     addChatMessage('system', `ERROR: ${message}`);
+}
+
+// ============================================================================
+// Git Operations
+// ============================================================================
+
+// Open Git modal
+function openGitModal() {
+    elements.gitModal.classList.add('active');
+    elements.gitUrl.value = '';
+    elements.folderName.value = '';
+    elements.gitStatusMessage.textContent = '';
+    elements.gitStatusMessage.className = 'git-status-message';
+}
+
+// Close Git modal
+function closeGitModal() {
+    elements.gitModal.classList.remove('active');
+    elements.gitUrl.value = '';
+    elements.folderName.value = '';
+    elements.gitStatusMessage.textContent = '';
+}
+
+// Handle cloning a repository
+async function handleCloneRepo() {
+    const gitUrl = elements.gitUrl.value.trim();
+    const folderName = elements.folderName.value.trim() || null;
+
+    // Validate URL
+    if (!gitUrl) {
+        showGitStatus('Please enter a repository URL', 'error');
+        return;
+    }
+
+    if (!gitUrl.startsWith('https://')) {
+        showGitStatus('Please use an HTTPS URL (e.g., https://github.com/...)', 'error');
+        return;
+    }
+
+    // Disable button during clone
+    elements.btnCloneRepo.disabled = true;
+    elements.btnCloneRepo.textContent = 'Cloning...';
+    showGitStatus('Cloning repository, please wait...', 'info');
+
+    try {
+        const response = await fetch('/api/git/clone', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                git_url: gitUrl,
+                folder_name: folderName,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to clone repository');
+        }
+
+        // Success! Update UI with cloned repo path
+        showGitStatus(`✓ Successfully cloned to: ${data.local_path}`, 'success');
+        addChatMessage('system', `Repository cloned: ${data.workspace_name} at ${data.local_path}`);
+
+        // Pre-fill the file path input with the cloned repo path
+        elements.filePathInput.value = `${data.local_path}/`;
+
+        // Close modal after a short delay
+        setTimeout(() => {
+            closeGitModal();
+        }, 2000);
+
+    } catch (error) {
+        showGitStatus(`✗ Clone failed: ${error.message}`, 'error');
+        console.error('Clone error:', error);
+    } finally {
+        elements.btnCloneRepo.disabled = false;
+        elements.btnCloneRepo.textContent = 'Clone & Open';
+    }
+}
+
+// Show status message in Git modal
+function showGitStatus(message, type) {
+    elements.gitStatusMessage.textContent = message;
+    elements.gitStatusMessage.className = `git-status-message ${type}`;
 }
 
 // Initialize on DOM ready

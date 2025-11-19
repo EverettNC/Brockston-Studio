@@ -68,6 +68,21 @@ class SuggestFixResponse(BaseModel):
     summary: str = Field(..., description="Short description of changes")
 
 
+# Git operation models
+
+class CloneRepoRequest(BaseModel):
+    """Request to clone a Git repository."""
+    git_url: str = Field(..., description="Git repository URL (HTTPS)")
+    folder_name: Optional[str] = Field(None, description="Optional custom folder name")
+
+
+class CloneRepoResponse(BaseModel):
+    """Response for cloning a repository."""
+    status: str = Field(default="ok", description="Operation status")
+    local_path: str = Field(..., description="Absolute path to cloned repository")
+    workspace_name: str = Field(..., description="Name of the cloned repository folder")
+
+
 # Error response model
 
 class ErrorResponse(BaseModel):

@@ -22,8 +22,11 @@ from .models import (
     ChatResponse,
     SuggestFixRequest,
     SuggestFixResponse,
+    CloneRepoRequest,
+    CloneRepoResponse,
     ErrorResponse,
 )
+from .git_service import clone_repo
 from .config import (
     HOST,
     PORT,
@@ -190,6 +193,54 @@ async def save_file(request: SaveFileRequest):
     except Exception as e:
         logger.error(f"Error saving file {request.path}: {e}")
         raise HTTPException(status_code=500, detail=f"Error saving file: {e}")
+
+
+# ============================================================================
+# Git Operation Endpoints
+# ============================================================================
+
+@app.post("/api/git/clone", response_model=CloneRepoResponse)
+async def git_clone(request: CloneRepoRequest):
+    """
+    Clone a Git repository into the workspace.
+
+    Args:
+        request: Repository URL and optional folder name
+
+    Returns:
+        Clone status with local path information
+
+    Raises:
+        HTTPException: If clone operation fails
+    """
+    try:
+        # Clone the repository
+        local_path = clone_repo(
+            git_url=request.git_url,
+            folder_name=request.folder_name,
+        )
+
+        # Extract workspace name from path
+        workspace_name = local_path.name
+
+        logger.info(f"Repository cloned successfully to: {local_path}")
+        return CloneRepoResponse(
+            status="ok",
+            local_path=str(local_path),
+            workspace_name=workspace_name,
+        )
+
+    except ValueError as e:
+        # Validation errors (invalid URL, path outside workspace, etc.)
+        logger.warning(f"Clone validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        # Git operation errors
+        logger.error(f"Git clone error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error during clone: {e}")
+        raise HTTPException(status_code=500, detail=f"Clone failed: {e}")
 
 
 # ============================================================================
