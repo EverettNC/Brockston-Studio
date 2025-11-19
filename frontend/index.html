@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BROCKSTON Studio</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <!-- Monaco Editor -->
+    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <div class="logo">
+                <h1>BROCKSTON Studio</h1>
+                <span class="subtitle">Local Code Workbench</span>
+            </div>
+            <div class="file-controls">
+                <input
+                    type="text"
+                    id="file-path"
+                    placeholder="Enter file path (e.g., myfile.py or /path/to/file.js)"
+                    class="file-path-input"
+                >
+                <button id="btn-open" class="btn btn-primary">Open</button>
+                <button id="btn-save" class="btn btn-success" disabled>Save</button>
+                <span id="workspace-info" class="workspace-info"></span>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Left Panel: Code Editor -->
+            <section class="editor-panel">
+                <div class="panel-header">
+                    <h2>Code Editor</h2>
+                    <span id="current-file" class="current-file">No file open</span>
+                </div>
+                <div id="monaco-editor" class="monaco-container"></div>
+            </section>
+
+            <!-- Right Panel: BROCKSTON Interaction -->
+            <section class="brockston-panel">
+                <!-- Chat Log -->
+                <div class="chat-section">
+                    <div class="panel-header">
+                        <h2>BROCKSTON Chat</h2>
+                        <button id="btn-clear-chat" class="btn btn-small">Clear</button>
+                    </div>
+                    <div id="chat-log" class="chat-log">
+                        <div class="chat-message system">
+                            <strong>BROCKSTON:</strong> Ready. Open a file and ask me anything.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Section -->
+                <div class="input-section">
+                    <div class="panel-header">
+                        <h3>Instructions</h3>
+                    </div>
+                    <textarea
+                        id="instruction-input"
+                        class="instruction-input"
+                        placeholder="Ask BROCKSTON a question or request a code change..."
+                    ></textarea>
+                    <div class="button-group">
+                        <button id="btn-ask" class="btn btn-primary" disabled>Ask BROCKSTON</button>
+                        <button id="btn-suggest" class="btn btn-warning" disabled>Suggest Fix</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Comparison Modal (for showing proposed vs current code) -->
+    <div id="comparison-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Proposed Changes</h2>
+                <button id="btn-close-modal" class="btn btn-small">&times;</button>
+            </div>
+            <div id="comparison-summary" class="comparison-summary"></div>
+            <div class="comparison-container">
+                <div class="comparison-panel">
+                    <h3>Current Code</h3>
+                    <pre id="current-code" class="code-preview"></pre>
+                </div>
+                <div class="comparison-panel">
+                    <h3>Proposed Code</h3>
+                    <pre id="proposed-code" class="code-preview"></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-reject" class="btn btn-secondary">Reject</button>
+                <button id="btn-apply" class="btn btn-success">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Consulting BROCKSTON...</p>
+    </div>
+
+    <!-- Monaco Editor Loader -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
+    <script>
+        // Configure Monaco loader
+        require.config({
+            paths: {
+                'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs'
+            }
+        });
+    </script>
+
+    <!-- Application JavaScript -->
+    <script src="/static/app.js"></script>
+</body>
+</html>
