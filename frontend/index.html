@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/static/styles.css">
     <!-- Monaco Editor -->
     <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+    <!-- xterm.js Terminal -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
 </head>
 <body>
     <div class="container">
@@ -30,49 +32,66 @@
             </div>
         </header>
 
-        <!-- Main Content Area -->
-        <main class="main-content">
-            <!-- Left Panel: Code Editor -->
-            <section class="editor-panel">
-                <div class="panel-header">
-                    <h2>Code Editor</h2>
-                    <span id="current-file" class="current-file">No file open</span>
-                </div>
-                <div id="monaco-editor" class="monaco-container"></div>
-            </section>
-
-            <!-- Right Panel: BROCKSTON Interaction -->
-            <section class="brockston-panel">
-                <!-- Chat Log -->
-                <div class="chat-section">
-                    <div class="panel-header">
-                        <h2>BROCKSTON Chat</h2>
-                        <button id="btn-clear-chat" class="btn btn-small">Clear</button>
-                    </div>
-                    <div id="chat-log" class="chat-log">
-                        <div class="chat-message system">
-                            <strong>BROCKSTON:</strong> Ready. Open a file and ask me anything.
+        <!-- Main Content Area with Resizable Panels -->
+        <div id="split-container" class="split-container">
+            <!-- Top Section (Horizontal Split: Editor | Brockston) -->
+            <div id="top-panels" class="top-panels">
+                <div id="split-horizontal" class="split-horizontal">
+                    <!-- Left Panel: Code Editor -->
+                    <section id="editor-panel" class="editor-panel">
+                        <div class="panel-header">
+                            <h2>Code Editor</h2>
+                            <span id="current-file" class="current-file">No file open</span>
                         </div>
-                    </div>
-                </div>
+                        <div id="monaco-editor" class="monaco-container"></div>
+                    </section>
 
-                <!-- Input Section -->
-                <div class="input-section">
-                    <div class="panel-header">
-                        <h3>Instructions</h3>
-                    </div>
-                    <textarea
-                        id="instruction-input"
-                        class="instruction-input"
-                        placeholder="Ask BROCKSTON a question or request a code change..."
-                    ></textarea>
-                    <div class="button-group">
-                        <button id="btn-ask" class="btn btn-primary" disabled>Ask BROCKSTON</button>
-                        <button id="btn-suggest" class="btn btn-warning" disabled>Suggest Fix</button>
+                    <!-- Right Panel: BROCKSTON Interaction -->
+                    <section id="brockston-panel" class="brockston-panel">
+                        <!-- Chat Log -->
+                        <div class="chat-section">
+                            <div class="panel-header">
+                                <h2>BROCKSTON Chat</h2>
+                                <button id="btn-clear-chat" class="btn btn-small">Clear</button>
+                            </div>
+                            <div id="chat-log" class="chat-log">
+                                <div class="chat-message system">
+                                    <strong>BROCKSTON:</strong> Ready. Open a file and ask me anything.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Input Section -->
+                        <div class="input-section">
+                            <div class="panel-header">
+                                <h3>Instructions</h3>
+                            </div>
+                            <textarea
+                                id="instruction-input"
+                                class="instruction-input"
+                                placeholder="Ask BROCKSTON a question or request a code change..."
+                            ></textarea>
+                            <div class="button-group">
+                                <button id="btn-ask" class="btn btn-primary" disabled>Ask BROCKSTON</button>
+                                <button id="btn-suggest" class="btn btn-warning" disabled>Suggest Fix</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Terminal -->
+            <div id="terminal-panel" class="terminal-panel">
+                <div class="panel-header">
+                    <h2>Terminal</h2>
+                    <div class="terminal-controls">
+                        <button id="btn-clear-terminal" class="btn btn-small">Clear</button>
+                        <button id="btn-new-terminal" class="btn btn-small">New</button>
                     </div>
                 </div>
-            </section>
-        </main>
+                <div id="terminal" class="terminal-container"></div>
+            </div>
+        </div>
     </div>
 
     <!-- Comparison Modal (for showing proposed vs current code) -->
@@ -153,6 +172,14 @@
             }
         });
     </script>
+
+    <!-- Split.js for Resizable Panels -->
+    <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+
+    <!-- xterm.js Terminal -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
 
     <!-- Application JavaScript -->
     <script src="/static/app.js"></script>
