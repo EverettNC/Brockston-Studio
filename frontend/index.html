@@ -46,17 +46,23 @@
                         <div id="monaco-editor" class="monaco-container"></div>
                     </section>
 
-                    <!-- Right Panel: BROCKSTON Interaction -->
+                    <!-- Right Panel: AI Interaction -->
                     <section id="brockston-panel" class="brockston-panel">
                         <!-- Chat Log -->
                         <div class="chat-section">
                             <div class="panel-header">
-                                <h2>BROCKSTON Chat</h2>
-                                <button id="btn-clear-chat" class="btn btn-small">Clear</button>
+                                <h2>AI Chat</h2>
+                                <div class="header-controls">
+                                    <select id="model-selector" class="model-selector">
+                                        <option value="brockston">BROCKSTON</option>
+                                        <option value="ultimateev">UltimateEV</option>
+                                    </select>
+                                    <button id="btn-clear-chat" class="btn btn-small">Clear</button>
+                                </div>
                             </div>
                             <div id="chat-log" class="chat-log">
                                 <div class="chat-message system">
-                                    <strong>BROCKSTON:</strong> Ready. Open a file and ask me anything.
+                                    <strong>AI:</strong> Ready. Open a file and ask me anything.
                                 </div>
                             </div>
                         </div>
@@ -65,16 +71,21 @@
                         <div class="input-section">
                             <div class="panel-header">
                                 <h3>Instructions</h3>
+                                <button id="btn-speech" class="btn btn-speech" title="Record voice message">
+                                    🎤
+                                </button>
                             </div>
                             <textarea
                                 id="instruction-input"
                                 class="instruction-input"
-                                placeholder="Ask BROCKSTON a question or request a code change..."
+                                placeholder="Ask AI a question or request a code change (or use voice)..."
                             ></textarea>
                             <div class="button-group">
-                                <button id="btn-ask" class="btn btn-primary" disabled>Ask BROCKSTON</button>
+                                <button id="btn-ask" class="btn btn-primary" disabled>Ask AI</button>
                                 <button id="btn-suggest" class="btn btn-warning" disabled>Suggest Fix</button>
                             </div>
+                            <!-- Audio Player for AI Responses -->
+                            <audio id="audio-player" class="audio-player" controls style="display: none;"></audio>
                         </div>
                     </section>
                 </div>

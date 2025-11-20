@@ -11,12 +11,13 @@ import ptyprocess
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, File, UploadFile
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from .brockston_client import BrockstonClient
+from .ai_client import AIClient
+from .speech_service import SpeechService
 from .models import (
     OpenFileResponse,
     SaveFileRequest,
@@ -27,6 +28,9 @@ from .models import (
     SuggestFixResponse,
     CloneRepoRequest,
     CloneRepoResponse,
+    TranscribeResponse,
+    SynthesizeSpeechRequest,
+    SpeechChatRequest,
     ErrorResponse,
 )
 from .git_service import clone_repo
@@ -34,6 +38,7 @@ from .config import (
     HOST,
     PORT,
     BROCKSTON_BASE_URL,
+    ULTIMATEEV_BASE_URL,
     resolve_path,
     get_workspace_root,
 )
@@ -61,15 +66,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize BROCKSTON client (singleton)
-brockston_client: Optional[BrockstonClient] = None
+# Initialize AI client and speech service (singletons)
+ai_client: Optional[AIClient] = None
+speech_service: Optional[SpeechService] = None
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on startup."""
-    global brockston_client
-    brockston_client = BrockstonClient(base_url=BROCKSTON_BASE_URL)
+    global ai_client, speech_service
+    ai_client = AIClient(
+        brockston_url=BROCKSTON_BASE_URL,
+        ultimateev_url=ULTIMATEEV_BASE_URL
+    )
+    speech_service = SpeechService()
     logger.info(f"BROCKSTON Studio starting on {HOST}:{PORT}")
     logger.info(f"Workspace root: {get_workspace_root()}")
 
@@ -77,9 +87,9 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Clean up services on shutdown."""
-    global brockston_client
-    if brockston_client:
-        await brockston_client.close()
+    global ai_client
+    if ai_client:
+        await ai_client.close()
     logger.info("BROCKSTON Studio shut down")
 
 
@@ -253,30 +263,39 @@ async def git_clone(request: CloneRepoRequest):
 @app.post("/api/brockston/chat", response_model=ChatResponse)
 async def brockston_chat(request: ChatRequest):
     """
-    Chat with BROCKSTON about code or ask questions.
+    Chat with AI assistant (BROCKSTON or UltimateEV) about code or ask questions.
 
     Args:
-        request: Chat messages and optional file context
+        request: Chat messages, optional file context, and model selection
 
     Returns:
-        BROCKSTON's reply
+        AI assistant's reply
 
     Raises:
-        HTTPException: If BROCKSTON communication fails
+        HTTPException: If AI communication fails
     """
     try:
         # Convert Pydantic models to dicts for client
         messages = [msg.dict() for msg in request.messages]
         context = request.context.dict() if request.context else None
+        model = request.model or "brockston"
 
-        # Call BROCKSTON
-        reply = await brockston_client.chat(messages=messages, context=context)
+        # Call AI client
+        reply = await ai_client.chat(
+            messages=messages,
+            model=model,
+            context=context
+        )
 
-        logger.info(f"BROCKSTON chat completed ({len(messages)} messages)")
+        logger.info(f"{model.upper()} chat completed ({len(messages)} messages)")
         return ChatResponse(reply=reply)
 
+    except ValueError as e:
+        # Invalid model selection
+        logger.error(f"Invalid model selection: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        logger.error(f"BROCKSTON chat error: {e}")
+        logger.error(f"AI chat error: {e}")
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in chat: {e}")
@@ -286,37 +305,184 @@ async def brockston_chat(request: ChatRequest):
 @app.post("/api/brockston/suggest_fix", response_model=SuggestFixResponse)
 async def brockston_suggest_fix(request: SuggestFixRequest):
     """
-    Ask BROCKSTON to suggest code improvements.
+    Ask AI assistant (BROCKSTON or UltimateEV) to suggest code improvements.
 
     Args:
-        request: Current code, instruction, and optional file path
+        request: Current code, instruction, optional file path, and model selection
 
     Returns:
         Proposed code and summary of changes
 
     Raises:
-        HTTPException: If BROCKSTON communication fails
+        HTTPException: If AI communication fails
     """
     try:
-        # Call BROCKSTON
-        result = await brockston_client.suggest_fix(
+        model = request.model or "brockston"
+
+        # Call AI client
+        result = await ai_client.suggest_fix(
             code=request.code,
             instruction=request.instruction,
+            model=model,
             path=request.path,
         )
 
-        logger.info(f"BROCKSTON suggest_fix completed: {request.instruction}")
+        logger.info(f"{model.upper()} suggest_fix completed: {request.instruction}")
         return SuggestFixResponse(
             proposed_code=result["proposed_code"],
             summary=result["summary"],
         )
 
+    except ValueError as e:
+        # Invalid model selection
+        logger.error(f"Invalid model selection: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
-        logger.error(f"BROCKSTON suggest_fix error: {e}")
+        logger.error(f"AI suggest_fix error: {e}")
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         logger.error(f"Unexpected error in suggest_fix: {e}")
         raise HTTPException(status_code=500, detail=f"Suggest fix error: {e}")
+
+
+# ============================================================================
+# Speech Interaction Endpoints
+# ============================================================================
+
+@app.post("/api/speech/transcribe", response_model=TranscribeResponse)
+async def transcribe_audio(audio: UploadFile = File(...)):
+    """
+    Transcribe audio to text using speech-to-text.
+
+    Args:
+        audio: Audio file upload (webm, mp3, mp4, wav, etc.)
+
+    Returns:
+        Transcribed text
+
+    Raises:
+        HTTPException: If transcription fails
+    """
+    try:
+        # Read audio data
+        audio_data = await audio.read()
+
+        # Transcribe audio
+        text = await speech_service.transcribe_audio(
+            audio_data=audio_data,
+            filename=audio.filename or "audio.webm"
+        )
+
+        logger.info(f"Transcribed audio: {len(audio_data)} bytes -> {len(text)} chars")
+        return TranscribeResponse(text=text)
+
+    except RuntimeError as e:
+        logger.error(f"Transcription error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in transcription: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription error: {e}")
+
+
+@app.post("/api/speech/synthesize")
+async def synthesize_speech(request: SynthesizeSpeechRequest):
+    """
+    Convert text to speech using text-to-speech.
+
+    Args:
+        request: Text to convert and voice selection
+
+    Returns:
+        Audio file (MP3 format)
+
+    Raises:
+        HTTPException: If synthesis fails
+    """
+    try:
+        # Synthesize speech
+        audio_data = await speech_service.synthesize_speech(
+            text=request.text,
+            voice=request.voice or "alloy"
+        )
+
+        logger.info(f"Synthesized speech: {len(request.text)} chars -> {len(audio_data)} bytes")
+
+        # Return audio as MP3
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": "attachment; filename=speech.mp3"
+            }
+        )
+
+    except RuntimeError as e:
+        logger.error(f"Speech synthesis error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in speech synthesis: {e}")
+        raise HTTPException(status_code=500, detail=f"Speech synthesis error: {e}")
+
+
+@app.post("/api/speech/chat")
+async def speech_chat(request: SpeechChatRequest):
+    """
+    Full speech-to-speech chat flow:
+    1. User's speech is already transcribed (included in messages)
+    2. Get AI response as text
+    3. Convert AI response to speech
+    4. Return both text and audio
+
+    Args:
+        request: Chat messages (with transcribed user speech), context, model, and voice
+
+    Returns:
+        Audio file (MP3 format) of AI response
+
+    Raises:
+        HTTPException: If chat or synthesis fails
+    """
+    try:
+        # Convert Pydantic models to dicts for client
+        messages = [msg.dict() for msg in request.messages]
+        context = request.context.dict() if request.context else None
+        model = request.model or "brockston"
+        voice = request.voice or "alloy"
+
+        # Get AI response
+        reply_text = await ai_client.chat(
+            messages=messages,
+            model=model,
+            context=context
+        )
+
+        # Convert response to speech
+        audio_data = await speech_service.synthesize_speech(
+            text=reply_text,
+            voice=voice
+        )
+
+        logger.info(f"Speech chat completed: {model.upper()} -> {len(audio_data)} bytes audio")
+
+        # Return audio with text in header for frontend
+        return Response(
+            content=audio_data,
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": "attachment; filename=response.mp3",
+                "X-Response-Text": reply_text[:500]  # First 500 chars in header
+            }
+        )
+
+    except ValueError as e:
+        logger.error(f"Invalid model selection: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        logger.error(f"Speech chat error: {e}")
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.error(f"Unexpected error in speech chat: {e}")
+        raise HTTPException(status_code=500, detail=f"Speech chat error: {e}")
 
 
 # ============================================================================

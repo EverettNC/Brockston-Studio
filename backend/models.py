@@ -43,9 +43,10 @@ class ChatContext(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """Request to chat with BROCKSTON."""
+    """Request to chat with AI assistant."""
     messages: List[ChatMessage] = Field(..., description="Conversation messages")
     context: Optional[ChatContext] = Field(None, description="Current file context")
+    model: Optional[str] = Field("brockston", description="AI model to use: 'brockston' or 'ultimateev'")
 
 
 class ChatResponse(BaseModel):
@@ -56,10 +57,11 @@ class ChatResponse(BaseModel):
 # BROCKSTON code suggestion models
 
 class SuggestFixRequest(BaseModel):
-    """Request for BROCKSTON to suggest code improvements."""
+    """Request for AI assistant to suggest code improvements."""
     instruction: str = Field(..., description="What to do (e.g., 'refactor for clarity')")
     path: Optional[str] = Field(None, description="Current file path")
     code: str = Field(..., description="Current file contents")
+    model: Optional[str] = Field("brockston", description="AI model to use: 'brockston' or 'ultimateev'")
 
 
 class SuggestFixResponse(BaseModel):
@@ -81,6 +83,27 @@ class CloneRepoResponse(BaseModel):
     status: str = Field(default="ok", description="Operation status")
     local_path: str = Field(..., description="Absolute path to cloned repository")
     workspace_name: str = Field(..., description="Name of the cloned repository folder")
+
+
+# Speech operation models
+
+class TranscribeResponse(BaseModel):
+    """Response from speech transcription."""
+    text: str = Field(..., description="Transcribed text from audio")
+
+
+class SynthesizeSpeechRequest(BaseModel):
+    """Request to synthesize speech from text."""
+    text: str = Field(..., description="Text to convert to speech")
+    voice: Optional[str] = Field("alloy", description="Voice to use for TTS")
+
+
+class SpeechChatRequest(BaseModel):
+    """Request for speech-to-speech chat."""
+    messages: List[ChatMessage] = Field(..., description="Conversation messages (including transcribed user speech)")
+    context: Optional[ChatContext] = Field(None, description="Current file context")
+    model: Optional[str] = Field("brockston", description="AI model to use: 'brockston' or 'ultimateev'")
+    voice: Optional[str] = Field("alloy", description="Voice to use for TTS response")
 
 
 # Error response model
