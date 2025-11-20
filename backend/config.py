@@ -24,6 +24,11 @@ WORKSPACE_ROOT = Path(os.getenv("BROCKSTON_WORKSPACE", str(DEFAULT_WORKSPACE)))
 # Ensure workspace exists
 WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
 
+# GitHub configuration
+# Personal Access Token for GitHub operations (clone, etc.)
+# Should have 'repo' scope for private repos
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+
 
 def resolve_path(relative_or_abs: str) -> Path:
     """

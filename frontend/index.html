@@ -17,6 +17,7 @@
                 <span class="subtitle">Local Code Workbench</span>
             </div>
             <div class="file-controls">
+                <button id="btn-git" class="btn btn-git">📦 Git Clone</button>
                 <input
                     type="text"
                     id="file-path"
@@ -95,6 +96,43 @@
             <div class="modal-footer">
                 <button id="btn-reject" class="btn btn-secondary">Reject</button>
                 <button id="btn-apply" class="btn btn-success">Apply Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Git Clone Modal -->
+    <div id="git-modal" class="modal">
+        <div class="modal-content git-modal-content">
+            <div class="modal-header">
+                <h2>Clone GitHub Repository</h2>
+                <button id="btn-close-git-modal" class="btn btn-small">&times;</button>
+            </div>
+            <div class="git-modal-body">
+                <div class="form-group">
+                    <label for="git-url">GitHub Repository URL</label>
+                    <input
+                        type="text"
+                        id="git-url"
+                        class="git-input"
+                        placeholder="https://github.com/username/repository.git"
+                    >
+                    <small class="help-text">Enter the HTTPS URL of the GitHub repository you want to clone</small>
+                </div>
+                <div class="form-group">
+                    <label for="folder-name">Local Folder Name (Optional)</label>
+                    <input
+                        type="text"
+                        id="folder-name"
+                        class="git-input"
+                        placeholder="Leave empty to use repository name"
+                    >
+                    <small class="help-text">Custom name for the local folder. If empty, uses the repository name.</small>
+                </div>
+                <div id="git-status-message" class="git-status-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="btn-cancel-clone" class="btn btn-secondary">Cancel</button>
+                <button id="btn-clone-repo" class="btn btn-success">Clone & Open</button>
             </div>
         </div>
     </div>
