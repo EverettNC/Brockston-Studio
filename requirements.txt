@@ -3,9 +3,13 @@
 # Web framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+python-multipart==0.0.6
 
-# HTTP client for BROCKSTON communication
+# HTTP client for AI model communication
 httpx==0.25.1
+
+# OpenAI API for speech services (Whisper & TTS)
+openai==1.3.0
 
 # Data validation
 pydantic==2.5.0

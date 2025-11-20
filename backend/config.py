@@ -13,8 +13,12 @@ from typing import Optional
 HOST = os.getenv("BROCKSTON_HOST", "127.0.0.1")
 PORT = int(os.getenv("BROCKSTON_PORT", "5055"))
 
-# BROCKSTON model endpoint
+# AI Model endpoints
 BROCKSTON_BASE_URL = os.getenv("BROCKSTON_BASE_URL", "http://localhost:6006")
+ULTIMATEEV_BASE_URL = os.getenv("ULTIMATEEV_BASE_URL", "http://localhost:6007")
+
+# Default AI model
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "brockston")
 
 # Workspace root - default to user's home directory
 # Can be overridden with BROCKSTON_WORKSPACE environment variable

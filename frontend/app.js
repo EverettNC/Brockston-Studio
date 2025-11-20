@@ -14,6 +14,10 @@ const state = {
     terminalSocket: null,
     horizontalSplit: null,
     verticalSplit: null,
+    selectedModel: 'brockston',
+    mediaRecorder: null,
+    audioChunks: [],
+    isRecording: false,
 };
 
 // DOM elements
@@ -49,6 +53,10 @@ const elements = {
     terminalContainer: null,
     btnClearTerminal: null,
     btnNewTerminal: null,
+    // Model selection and speech elements
+    modelSelector: null,
+    btnSpeech: null,
+    audioPlayer: null,
 };
 
 // Initialize application
@@ -85,6 +93,10 @@ function init() {
     elements.terminalContainer = document.getElementById('terminal');
     elements.btnClearTerminal = document.getElementById('btn-clear-terminal');
     elements.btnNewTerminal = document.getElementById('btn-new-terminal');
+    // Model selection and speech elements
+    elements.modelSelector = document.getElementById('model-selector');
+    elements.btnSpeech = document.getElementById('btn-speech');
+    elements.audioPlayer = document.getElementById('audio-player');
 
     // Initialize Split Panels
     initSplitPanels();
@@ -279,6 +291,10 @@ function attachEventListeners() {
     elements.btnClearTerminal.addEventListener('click', handleClearTerminal);
     elements.btnNewTerminal.addEventListener('click', handleNewTerminal);
 
+    // Model selection and speech event listeners
+    elements.modelSelector.addEventListener('change', handleModelChange);
+    elements.btnSpeech.addEventListener('click', handleSpeechToggle);
+
     // Enter key in file path opens file
     elements.filePathInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -432,6 +448,7 @@ async function handleAskBrockston() {
                     path: state.currentFilePath,
                     code: code,
                 },
+                model: state.selectedModel,
             }),
         });
 
@@ -483,6 +500,7 @@ async function handleSuggestFix() {
                 instruction: instruction,
                 path: state.currentFilePath,
                 code: code,
+                model: state.selectedModel,
             }),
         });
 
@@ -703,6 +721,189 @@ async function handleCloneRepo() {
 function showGitStatus(message, type) {
     elements.gitStatusMessage.textContent = message;
     elements.gitStatusMessage.className = `git-status-message ${type}`;
+}
+
+// ============================================================================
+// Model Selection and Speech Handlers
+// ============================================================================
+
+// Handle model selection change
+function handleModelChange() {
+    state.selectedModel = elements.modelSelector.value;
+    const modelName = state.selectedModel.toUpperCase();
+    addChatMessage('system', `Switched to ${modelName} model`);
+    console.log(`Model changed to: ${state.selectedModel}`);
+}
+
+// Handle speech recording toggle
+async function handleSpeechToggle() {
+    if (state.isRecording) {
+        // Stop recording
+        stopRecording();
+    } else {
+        // Start recording
+        await startRecording();
+    }
+}
+
+// Start audio recording
+async function startRecording() {
+    try {
+        // Request microphone access
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+        // Create media recorder
+        state.mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm'
+        });
+
+        state.audioChunks = [];
+
+        // Collect audio data
+        state.mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                state.audioChunks.push(event.data);
+            }
+        };
+
+        // Handle recording stop
+        state.mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+            await handleAudioRecorded(audioBlob);
+
+            // Stop all tracks
+            stream.getTracks().forEach(track => track.stop());
+        };
+
+        // Start recording
+        state.mediaRecorder.start();
+        state.isRecording = true;
+
+        // Update UI
+        elements.btnSpeech.textContent = '⏹️';
+        elements.btnSpeech.classList.add('recording');
+        addChatMessage('system', 'Recording... Click again to stop.');
+
+        console.log('Recording started');
+
+    } catch (error) {
+        console.error('Microphone access error:', error);
+        showError('Failed to access microphone. Please grant permission and try again.');
+    }
+}
+
+// Stop audio recording
+function stopRecording() {
+    if (state.mediaRecorder && state.isRecording) {
+        state.mediaRecorder.stop();
+        state.isRecording = false;
+
+        // Update UI
+        elements.btnSpeech.textContent = '🎤';
+        elements.btnSpeech.classList.remove('recording');
+        addChatMessage('system', 'Processing your voice message...');
+
+        console.log('Recording stopped');
+    }
+}
+
+// Handle recorded audio
+async function handleAudioRecorded(audioBlob) {
+    showLoading();
+
+    try {
+        // Step 1: Transcribe audio to text
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+
+        const transcribeResponse = await fetch('/api/speech/transcribe', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!transcribeResponse.ok) {
+            const error = await transcribeResponse.json();
+            throw new Error(error.error || 'Failed to transcribe audio');
+        }
+
+        const transcribeData = await transcribeResponse.json();
+        const transcribedText = transcribeData.text;
+
+        addChatMessage('user', `🎤 ${transcribedText}`);
+
+        // Step 2: Get AI response (with speech)
+        const code = state.currentFilePath ? state.editor.getValue() : '';
+
+        const messages = [
+            {
+                role: 'system',
+                content: 'You are an AI coding assistant. Be concise, precise, and helpful.',
+            },
+            {
+                role: 'user',
+                content: transcribedText,
+            },
+        ];
+
+        const chatResponse = await fetch('/api/speech/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                messages: messages,
+                context: state.currentFilePath ? {
+                    path: state.currentFilePath,
+                    code: code,
+                } : null,
+                model: state.selectedModel,
+                voice: 'alloy',
+            }),
+        });
+
+        if (!chatResponse.ok) {
+            const error = await chatResponse.json();
+            throw new Error(error.error || 'Failed to get AI response');
+        }
+
+        // Get response text from header
+        const responseText = chatResponse.headers.get('X-Response-Text') || 'Audio response generated';
+
+        // Get audio data
+        const audioData = await chatResponse.blob();
+
+        // Display response text
+        addChatMessage('assistant', `🔊 ${responseText}`);
+
+        // Play audio response
+        playAudioResponse(audioData);
+
+    } catch (error) {
+        console.error('Speech processing error:', error);
+        showError(`Speech processing failed: ${error.message}`);
+    } finally {
+        hideLoading();
+    }
+}
+
+// Play audio response
+function playAudioResponse(audioBlob) {
+    try {
+        const audioUrl = URL.createObjectURL(audioBlob);
+        elements.audioPlayer.src = audioUrl;
+        elements.audioPlayer.style.display = 'block';
+        elements.audioPlayer.play();
+
+        // Clean up URL after playback
+        elements.audioPlayer.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+        };
+
+        console.log('Playing audio response');
+    } catch (error) {
+        console.error('Audio playback error:', error);
+        showError('Failed to play audio response');
+    }
 }
 
 // ============================================================================
