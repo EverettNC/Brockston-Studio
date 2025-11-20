@@ -10,6 +10,10 @@ const state = {
     currentFilePath: null,
     proposedCode: null,
     chatHistory: [],
+    terminal: null,
+    terminalSocket: null,
+    horizontalSplit: null,
+    verticalSplit: null,
 };
 
 // DOM elements
@@ -41,6 +45,10 @@ const elements = {
     gitUrl: null,
     folderName: null,
     gitStatusMessage: null,
+    // Terminal elements
+    terminalContainer: null,
+    btnClearTerminal: null,
+    btnNewTerminal: null,
 };
 
 // Initialize application
@@ -73,15 +81,163 @@ function init() {
     elements.gitUrl = document.getElementById('git-url');
     elements.folderName = document.getElementById('folder-name');
     elements.gitStatusMessage = document.getElementById('git-status-message');
+    // Terminal elements
+    elements.terminalContainer = document.getElementById('terminal');
+    elements.btnClearTerminal = document.getElementById('btn-clear-terminal');
+    elements.btnNewTerminal = document.getElementById('btn-new-terminal');
+
+    // Initialize Split Panels
+    initSplitPanels();
 
     // Initialize Monaco Editor
     initMonacoEditor();
+
+    // Initialize Terminal
+    initTerminal();
 
     // Attach event listeners
     attachEventListeners();
 
     // Load workspace info
     loadWorkspaceInfo();
+}
+
+// Initialize Split Panels
+function initSplitPanels() {
+    // Horizontal split (editor | brockston)
+    state.horizontalSplit = Split(['#editor-panel', '#brockston-panel'], {
+        sizes: [60, 40],
+        minSize: [300, 300],
+        gutterSize: 8,
+        cursor: 'col-resize',
+        direction: 'horizontal',
+    });
+
+    // Vertical split (top panels | terminal)
+    state.verticalSplit = Split(['#top-panels', '#terminal-panel'], {
+        sizes: [70, 30],
+        minSize: [200, 150],
+        gutterSize: 8,
+        cursor: 'row-resize',
+        direction: 'vertical',
+    });
+
+    console.log('Split panels initialized');
+}
+
+// Initialize Terminal
+function initTerminal() {
+    // Create xterm.js terminal instance
+    state.terminal = new Terminal({
+        cursorBlink: true,
+        cursorStyle: 'block',
+        fontSize: 14,
+        fontFamily: '"Cascadia Code", "Fira Code", "Courier New", monospace',
+        theme: {
+            background: '#000000',
+            foreground: '#f8fafc',
+            cursor: '#00d9ff',
+            cursorAccent: '#000000',
+            selection: 'rgba(0, 217, 255, 0.3)',
+            black: '#0a0e1a',
+            red: '#ff6b6b',
+            green: '#00ff9f',
+            yellow: '#ffd93d',
+            blue: '#00d9ff',
+            magenta: '#bd00ff',
+            cyan: '#6bceff',
+            white: '#f8fafc',
+            brightBlack: '#64748b',
+            brightRed: '#ff8787',
+            brightGreen: '#69ffb4',
+            brightYellow: '#ffe066',
+            brightBlue: '#4de4ff',
+            brightMagenta: '#d966ff',
+            brightCyan: '#89d4ff',
+            brightWhite: '#ffffff',
+        },
+        scrollback: 1000,
+        allowProposedApi: true,
+    });
+
+    // Add fit addon
+    const fitAddon = new FitAddon.FitAddon();
+    state.terminal.loadAddon(fitAddon);
+
+    // Add web links addon
+    const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+    state.terminal.loadAddon(webLinksAddon);
+
+    // Open terminal in DOM
+    state.terminal.open(elements.terminalContainer);
+    fitAddon.fit();
+
+    // Welcome message
+    state.terminal.writeln('\x1b[1;36m╔══════════════════════════════════════════════╗\x1b[0m');
+    state.terminal.writeln('\x1b[1;36m║\x1b[0m  \x1b[1;37mBROCKSTON Studio Terminal\x1b[0m                 \x1b[1;36m║\x1b[0m');
+    state.terminal.writeln('\x1b[1;36m╚══════════════════════════════════════════════╝\x1b[0m');
+    state.terminal.writeln('');
+    state.terminal.writeln('\x1b[1;33mConnecting to shell...\x1b[0m');
+    state.terminal.writeln('');
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        fitAddon.fit();
+    });
+
+    // Connect to WebSocket
+    connectTerminalWebSocket();
+
+    console.log('Terminal initialized');
+}
+
+// Connect Terminal to WebSocket
+function connectTerminalWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/terminal`;
+
+    try {
+        state.terminalSocket = new WebSocket(wsUrl);
+
+        state.terminalSocket.onopen = () => {
+            console.log('Terminal WebSocket connected');
+            state.terminal.writeln('\x1b[1;32m✓ Connected to shell\x1b[0m');
+            state.terminal.writeln('');
+
+            // Handle terminal input
+            state.terminal.onData((data) => {
+                if (state.terminalSocket && state.terminalSocket.readyState === WebSocket.OPEN) {
+                    state.terminalSocket.send(JSON.stringify({
+                        type: 'input',
+                        data: data,
+                    }));
+                }
+            });
+        };
+
+        state.terminalSocket.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            if (message.type === 'output') {
+                state.terminal.write(message.data);
+            }
+        };
+
+        state.terminalSocket.onerror = (error) => {
+            console.error('Terminal WebSocket error:', error);
+            state.terminal.writeln('\x1b[1;31m✗ Connection error\x1b[0m');
+        };
+
+        state.terminalSocket.onclose = () => {
+            console.log('Terminal WebSocket closed');
+            state.terminal.writeln('');
+            state.terminal.writeln('\x1b[1;33m⚠ Connection closed. Click "New" to reconnect.\x1b[0m');
+        };
+
+    } catch (error) {
+        console.error('Failed to create WebSocket:', error);
+        state.terminal.writeln('\x1b[1;31m✗ Failed to connect to shell\x1b[0m');
+        state.terminal.writeln('\x1b[2;37m  WebSocket endpoint not available\x1b[0m');
+    }
 }
 
 // Initialize Monaco Editor
@@ -118,6 +274,10 @@ function attachEventListeners() {
     elements.btnCloseGitModal.addEventListener('click', closeGitModal);
     elements.btnCancelClone.addEventListener('click', closeGitModal);
     elements.btnCloneRepo.addEventListener('click', handleCloneRepo);
+
+    // Terminal event listeners
+    elements.btnClearTerminal.addEventListener('click', handleClearTerminal);
+    elements.btnNewTerminal.addEventListener('click', handleNewTerminal);
 
     // Enter key in file path opens file
     elements.filePathInput.addEventListener('keypress', (e) => {
@@ -543,6 +703,42 @@ async function handleCloneRepo() {
 function showGitStatus(message, type) {
     elements.gitStatusMessage.textContent = message;
     elements.gitStatusMessage.className = `git-status-message ${type}`;
+}
+
+// ============================================================================
+// Terminal Operations
+// ============================================================================
+
+// Clear terminal
+function handleClearTerminal() {
+    if (state.terminal) {
+        state.terminal.clear();
+        console.log('Terminal cleared');
+    }
+}
+
+// Create new terminal session
+function handleNewTerminal() {
+    if (state.terminal) {
+        // Close existing WebSocket if any
+        if (state.terminalSocket) {
+            state.terminalSocket.close();
+        }
+
+        // Clear terminal
+        state.terminal.clear();
+
+        // Reconnect
+        state.terminal.writeln('\x1b[1;36m╔══════════════════════════════════════════════╗\x1b[0m');
+        state.terminal.writeln('\x1b[1;36m║\x1b[0m  \x1b[1;37mBROCKSTON Studio Terminal\x1b[0m                 \x1b[1;36m║\x1b[0m');
+        state.terminal.writeln('\x1b[1;36m╚══════════════════════════════════════════════╝\x1b[0m');
+        state.terminal.writeln('');
+        state.terminal.writeln('\x1b[1;33mConnecting to shell...\x1b[0m');
+        state.terminal.writeln('');
+
+        connectTerminalWebSocket();
+        console.log('New terminal session created');
+    }
 }
 
 // Initialize on DOM ready
