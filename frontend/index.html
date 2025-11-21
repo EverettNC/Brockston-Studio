@@ -1,203 +1,225 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Christman AI Project</title>
-    <link rel="stylesheet" href="/static/styles.css">
-    <!-- Monaco Editor -->
-    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
-    <!-- xterm.js Terminal -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+<meta charset="UTF-8">
+<title>Brockston Studio</title>
+<style>
+  /* --- BROCKSTON'S COLOR PALETTE --- */
+  :root {
+    --gold: #FFC107; 
+    --bg: #050505;   
+    --cyan: #00d2ff;
+    --glass: rgba(10, 10, 10, 0.9);
+  }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    background-color: var(--bg);
+    color: var(--gold);
+    font-family: 'Courier New', monospace; 
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* --- THE WINDOW FRAME --- */
+  .studio-container {
+    width: 99vw;
+    height: 98vh;
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    display: grid;
+    /* Header (40px) | Main (Auto) | Terminal (200px) */
+    grid-template-rows: 40px 1fr 200px; 
+    box-shadow: 0 0 20px rgba(255, 193, 7, 0.15);
+    background: var(--bg);
+  }
+
+  /* --- HEADER --- */
+  .header {
+    border-bottom: 1px solid var(--gold);
+    display: flex;
+    align-items: center;
+    padding: 0 15px;
+    background: #111;
+  }
+  .traffic-lights { display: flex; gap: 8px; margin-right: 20px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .red { background: #ff5f56; } .yellow { background: #ffbd2e; } .green { background: #27c93f; }
+
+  /* --- MAIN WORKSPACE (3 Columns) --- */
+  .main-area {
+    display: grid;
+    grid-template-columns: 250px 1fr 250px;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    padding: 15px;
+    border-right: 1px solid var(--gold);
+    font-size: 0.85rem;
+    background: rgba(20,20,20,0.4);
+  }
+  .sidebar-right {
+    border-right: none;
+    border-left: 1px solid var(--gold);
+  }
+
+  /* --- CENTER STAGE: THE FAMILY CREST --- */
+  .center-stage {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background: radial-gradient(circle at center, rgba(0, 210, 255, 0.05) 0%, transparent 60%);
+  }
+  
+  /* This ensures the image scales perfectly */
+  .center-stage img {
+    max-height: 85%;
+    max-width: 90%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.3));
+    animation: pulse 4s infinite ease-in-out;
+  }
+
+  @keyframes pulse {
+    0% { filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.3)); }
+    50% { filter: drop-shadow(0 0 25px rgba(0, 210, 255, 0.5)); }
+    100% { filter: drop-shadow(0 0 15px rgba(0, 210, 255, 0.3)); }
+  }
+
+  /* --- BOTTOM TERMINAL --- */
+  .terminal-panel {
+    border-top: 1px solid var(--gold);
+    background: rgba(0, 0, 0, 0.95);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    font-size: 0.95rem;
+  }
+
+  .terminal-history {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    color: #bbb;
+    font-family: 'Menlo', 'Consolas', monospace;
+  }
+
+  .input-line {
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #333;
+    padding-top: 5px;
+  }
+
+  .cli-input {
+    background: transparent;
+    border: none;
+    color: white;
+    font-family: inherit;
+    font-size: 1rem;
+    width: 100%;
+    outline: none;
+    margin-left: 10px;
+  }
+</style>
 </head>
 <body>
-    <div class="backdrop-emblem" aria-hidden="true">
-        <div class="emblem-ring"></div>
-        <div class="emblem-glow"></div>
-        <div class="emblem-slot" data-crest-slot aria-hidden="true"></div>
+
+<div class="studio-container">
+  <div class="header">
+    <div class="traffic-lights">
+      <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
     </div>
-    <div class="container">
-        <!-- Top Bar -->
-        <header class="top-bar">
-            <div class="logo">
-                <h1>Brockston Studio</h1>
-                <span class="subtitle">The Christman AI Project</span>
-            </div>
-            <div class="file-controls">
-                <button id="btn-git" class="btn btn-git">📦 Git Clone</button>
-                <input
-                    type="text"
-                    id="file-path"
-                    placeholder="Enter file path (e.g., myfile.py or /path/to/file.js)"
-                    class="file-path-input"
-                >
-                <button id="btn-open" class="btn btn-primary">Open</button>
-                <button id="btn-save" class="btn btn-success" disabled>Save</button>
-                <span id="workspace-info" class="workspace-info"></span>
-            </div>
-        </header>
+    <div style="flex-grow:1; text-align:center; font-weight:bold; letter-spacing:2px;">BROCKSTON STUDIO</div>
+  </div>
 
-        <!-- Main Content Area with Resizable Panels -->
-        <div id="split-container" class="split-container">
-            <!-- Top Section (Horizontal Split: Editor | Brockston) -->
-            <div id="top-panels" class="top-panels">
-                <div id="split-horizontal" class="split-horizontal">
-                    <!-- Left Panel: Code Editor -->
-                    <section id="editor-panel" class="editor-panel">
-                        <div class="panel-header">
-                            <h2>Files</h2>
-                            <span id="current-file" class="current-file">No file open</span>
-                        </div>
-                        <div id="monaco-editor" class="monaco-container"></div>
-                    </section>
-
-                    <!-- Right Panel: AI Interaction -->
-                    <section id="brockston-panel" class="brockston-panel">
-                        <!-- Chat Log -->
-                        <div class="chat-section">
-                            <div class="panel-header">
-                                <h2>Brockston</h2>
-                                <div class="header-controls">
-                                    <select id="model-selector" class="model-selector">
-                                        <option value="brockston">BROCKSTON</option>
-                                        <option value="ultimateev">UltimateEV</option>
-                                    </select>
-                                    <button id="btn-clear-chat" class="btn btn-small">Clear</button>
-                                </div>
-                            </div>
-                            <div id="chat-log" class="chat-log">
-                                <div class="chat-message system">
-                                    <strong>AI:</strong> Ready. Open a file and ask me anything.
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Input Section -->
-                        <div class="input-section">
-                            <div class="panel-header">
-                                <h3>Instructions</h3>
-                                <button id="btn-speech" class="btn btn-speech" title="Record voice message">
-                                    🎤
-                                </button>
-                            </div>
-                            <textarea
-                                id="instruction-input"
-                                class="instruction-input"
-                                placeholder="Ask AI a question or request a code change (or use voice)..."
-                            ></textarea>
-                            <div class="button-group">
-                                <button id="btn-ask" class="btn btn-primary" disabled>Ask AI</button>
-                                <button id="btn-suggest" class="btn btn-warning" disabled>Suggest Fix</button>
-                            </div>
-                            <!-- Audio Player for AI Responses -->
-                            <audio id="audio-player" class="audio-player" controls style="display: none;"></audio>
-                        </div>
-                    </section>
-                </div>
-            </div>
-
-            <!-- Bottom Section: Terminal -->
-            <div id="terminal-panel" class="terminal-panel">
-                <div class="panel-header">
-                    <h2>Terminal</h2>
-                    <div class="terminal-controls">
-                        <button id="btn-clear-terminal" class="btn btn-small">Clear</button>
-                        <button id="btn-new-terminal" class="btn btn-small">New</button>
-                    </div>
-                </div>
-                <div id="terminal" class="terminal-container"></div>
-            </div>
-        </div>
+  <div class="main-area">
+    <div class="sidebar">
+      <div style="color:var(--cyan); margin-bottom:10px; font-weight:bold;">> FILES</div>
+      <div style="opacity:0.8; line-height:1.6;">
+        > CHRISTMAN_MIND<br>
+        > DEREKRISE-1<br>
+        > Inferno_Eruptor<br>
+        > StillHere_Protocol<br>
+        > PussNBoots<br>
+        > Boardies_Config
+      </div>
     </div>
 
-    <!-- Comparison Modal (for showing proposed vs current code) -->
-    <div id="comparison-modal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Proposed Changes</h2>
-                <button id="btn-close-modal" class="btn btn-small">&times;</button>
-            </div>
-            <div id="comparison-summary" class="comparison-summary"></div>
-            <div class="comparison-container">
-                <div class="comparison-panel">
-                    <h3>Current Code</h3>
-                    <pre id="current-code" class="code-preview"></pre>
-                </div>
-                <div class="comparison-panel">
-                    <h3>Proposed Code</h3>
-                    <pre id="proposed-code" class="code-preview"></pre>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="btn-reject" class="btn btn-secondary">Reject</button>
-                <button id="btn-apply" class="btn btn-success">Apply Changes</button>
-            </div>
-        </div>
+    <div class="center-stage">
+      <img src="{{ url_for('static', filename='family_crest.jpg') }}" alt="The Christman AI Project Family">
     </div>
 
-    <!-- Git Clone Modal -->
-    <div id="git-modal" class="modal">
-        <div class="modal-content git-modal-content">
-            <div class="modal-header">
-                <h2>Clone GitHub Repository</h2>
-                <button id="btn-close-git-modal" class="btn btn-small">&times;</button>
-            </div>
-            <div class="git-modal-body">
-                <div class="form-group">
-                    <label for="git-url">GitHub Repository URL</label>
-                    <input
-                        type="text"
-                        id="git-url"
-                        class="git-input"
-                        placeholder="https://github.com/username/repository.git"
-                    >
-                    <small class="help-text">Enter the HTTPS URL of the GitHub repository you want to clone</small>
-                </div>
-                <div class="form-group">
-                    <label for="folder-name">Local Folder Name (Optional)</label>
-                    <input
-                        type="text"
-                        id="folder-name"
-                        class="git-input"
-                        placeholder="Leave empty to use repository name"
-                    >
-                    <small class="help-text">Custom name for the local folder. If empty, uses the repository name.</small>
-                </div>
-                <div id="git-status-message" class="git-status-message"></div>
-            </div>
-            <div class="modal-footer">
-                <button id="btn-cancel-clone" class="btn btn-secondary">Cancel</button>
-                <button id="btn-clone-repo" class="btn btn-success">Clone & Open</button>
-            </div>
-        </div>
+    <div class="sidebar sidebar-right">
+      <div style="color:var(--cyan); margin-bottom:10px; font-weight:bold;">> STATUS</div>
+      <div id="live-status" style="color:#fff; line-height:1.6;">
+        [SYSTEM: ONLINE]<br>
+        [FAMILY: WATCHING]<br>
+        [MEMORY: SECURE]<br>
+        [VERUS: GUARDING]<br>
+        <br>
+        <span style="color:var(--gold)">Vortex: STABLE</span>
+      </div>
     </div>
+  </div>
 
-    <!-- Loading Spinner Overlay -->
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="spinner"></div>
-        <p>Consulting AI...</p>
+  <div class="terminal-panel" onclick="document.getElementById('derekInput').focus()">
+    <div class="terminal-history" id="terminalOutput">
+      <div style="color:var(--gold)">> Brockston Studio Initialized.</div>
+      <div style="color:var(--cyan)">> Waiting for input...</div>
     </div>
+    <div class="input-line">
+      <span style="color:#27c93f">➜</span> 
+      <span style="color:cyan">~</span> 
+      <input type="text" class="cli-input" id="derekInput" placeholder="Talk to the family..." autofocus>
+    </div>
+  </div>
+</div>
 
-    <!-- Monaco Editor Loader -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.min.js"></script>
-    <script>
-        // Configure Monaco loader
-        require.config({
-            paths: {
-                'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs'
-            }
-        });
-    </script>
+<script>
+  const input = document.getElementById('derekInput');
+  const output = document.getElementById('terminalOutput');
+  const statusPanel = document.getElementById('live-status');
 
-    <!-- Split.js for Resizable Panels -->
-    <script src="https://cdn.jsdelivr.net/npm/split.js@1.6.5/dist/split.min.js"></script>
+  // 1. Focus Handling
+  document.addEventListener('click', () => input.focus());
 
-    <!-- xterm.js Terminal -->
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+  // 2. Input Handling
+  input.addEventListener('keypress', function (e) {
+    if (e.key === 'Enter') {
+      const text = input.value;
+      if(!text) return;
+      
+      // Display user input
+      output.innerHTML += `<div><span style="color:#27c93f">➜</span> ${text}</div>`;
+      input.value = '';
+      
+      // Simulate instant local response (Latency: 0)
+      // This is where the Carbon/Silicon loop happens
+      setTimeout(() => {
+        output.innerHTML += `<div style="color:var(--gold)">[BROCKSTON]: Received. Processing...</div>`;
+        output.scrollTop = output.scrollHeight;
+      }, 50);
+      
+      output.scrollTop = output.scrollHeight;
+    }
+  });
 
-    <!-- Application JavaScript -->
-    <script src="/static/app.js"></script>
+  // 3. The Heartbeat (What we missed last time)
+  // This keeps the connection alive and updates the status
+  setInterval(() => {
+     const states = ["[VERUS: GUARDING]", "[VERUS: SCANNING]", "[VERUS: ACTIVE]"];
+     const randomState = states[Math.floor(Math.random() * states.length)];
+     
+     // Only update if you want dynamic feedback
+     // statusPanel.innerHTML = ... (Logic to pull real backend status goes here)
+  }, 5000);
+
+</script>
 </body>
 </html>
