@@ -11,12 +11,21 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
 </head>
 <body>
+    <div class="backdrop-emblem" aria-hidden="true">
+        <div class="emblem-ring"></div>
+        <div class="emblem-core"></div>
+        <div class="emblem-text">
+            <span class="emblem-text-small">THE</span>
+            <span class="emblem-text-large">CHRISTMAN</span>
+            <span class="emblem-text-small">AI PROJECT</span>
+        </div>
+    </div>
     <div class="container">
         <!-- Top Bar -->
         <header class="top-bar">
             <div class="logo">
-                <h1>THE CHRISTMAN AI PROJECT</h1>
-                <span class="subtitle">Local Code Workbench</span>
+                <h1>Brockston Studio</h1>
+                <span class="subtitle">The Christman AI Project</span>
             </div>
             <div class="file-controls">
                 <button id="btn-git" class="btn btn-git">📦 Git Clone</button>
@@ -40,7 +49,7 @@
                     <!-- Left Panel: Code Editor -->
                     <section id="editor-panel" class="editor-panel">
                         <div class="panel-header">
-                            <h2>Code Editor</h2>
+                            <h2>Files</h2>
                             <span id="current-file" class="current-file">No file open</span>
                         </div>
                         <div id="monaco-editor" class="monaco-container"></div>
@@ -51,7 +60,7 @@
                         <!-- Chat Log -->
                         <div class="chat-section">
                             <div class="panel-header">
-                                <h2>AI Chat</h2>
+                                <h2>Brockston</h2>
                                 <div class="header-controls">
                                     <select id="model-selector" class="model-selector">
                                         <option value="brockston">BROCKSTON</option>

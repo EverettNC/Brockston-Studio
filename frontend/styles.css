@@ -1,5 +1,7 @@
 /* BROCKSTON Studio Styles */
 
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+
 :root {
     /* Professional Color Palette - Cyberpunk/Modern Tech */
     --primary: #00d9ff;
@@ -26,8 +28,15 @@
     --text-muted: #64748b;
 
     /* Border & UI Elements */
-    --border: #2d3748;
-    --border-light: #374151;
+    --gold: #f9b941;
+    --gold-dark: #d78a12;
+    --gold-soft: rgba(249, 185, 65, 0.35);
+    --panel-bg: rgba(6, 10, 20, 0.82);
+    --panel-bg-strong: rgba(8, 13, 24, 0.92);
+    --emblem-blue: #4de4ff;
+    --emblem-blue-soft: rgba(77, 228, 255, 0.4);
+    --border: var(--gold-soft);
+    --border-light: rgba(249, 185, 65, 0.55);
     --gutter-bg: #1a1f2e;
     --gutter-hover: var(--primary);
 
@@ -41,6 +50,7 @@
     --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
     --glow-primary: 0 0 20px var(--primary-glow);
     --glow-accent: 0 0 20px var(--accent-glow);
+    --frame-padding: clamp(1.5rem, 3.5vh, 2.75rem);
 }
 
 * {
@@ -51,17 +61,117 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: var(--bg-dark);
+    background: radial-gradient(circle at center, rgba(8, 126, 255, 0.35) 0%, rgba(0, 10, 27, 0.15) 35%, rgba(0, 0, 0, 0.85) 65%), #000000;
     color: var(--text-primary);
     height: 100vh;
     overflow: hidden;
+    position: relative;
+    padding: var(--frame-padding);
+}
+
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(8, 126, 255, 0.22) 0%, rgba(3, 28, 54, 0.18) 36%, rgba(0, 0, 0, 0.9) 68%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.backdrop-emblem {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: clamp(320px, 38vw, 520px);
+    aspect-ratio: 1 / 1;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 0;
+    filter: drop-shadow(0 0 45px rgba(77, 228, 255, 0.45));
+}
+
+.emblem-ring,
+.emblem-core {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+}
+
+.emblem-ring {
+    border: 3px solid rgba(77, 228, 255, 0.35);
+    box-shadow:
+        0 0 25px var(--emblem-blue-soft),
+        inset 0 0 45px rgba(12, 160, 255, 0.55);
+}
+
+.emblem-core {
+    inset: 12%;
+    background: radial-gradient(circle, rgba(9, 167, 255, 0.35) 0%, rgba(0, 22, 46, 0.4) 55%, rgba(0, 0, 0, 0.85) 85%);
+    filter: blur(0.5px);
+    box-shadow: 0 0 80px rgba(77, 228, 255, 0.25);
+}
+
+.emblem-text {
+    position: relative;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: #c5f6ff;
+    text-shadow:
+        0 0 12px rgba(77, 228, 255, 0.7),
+        0 0 32px rgba(24, 146, 255, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(0.2rem, 1.2vh, 0.6rem);
+}
+
+.emblem-text-small {
+    font-size: clamp(0.85rem, 1.2vw, 1.1rem);
+    font-weight: 600;
+    letter-spacing: 0.45em;
+}
+
+.emblem-text-large {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 0.08em;
 }
 
 /* Container */
 .container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: calc(100vh - (var(--frame-padding) * 2));
+    position: relative;
+    z-index: 1;
+    border-radius: 22px;
+    border: 1px solid rgba(249, 185, 65, 0.45);
+    background: linear-gradient(180deg, rgba(8, 12, 24, 0.82) 0%, rgba(4, 6, 12, 0.92) 100%);
+    box-shadow:
+        0 0 0 1px rgba(249, 185, 65, 0.2),
+        0 28px 55px rgba(0, 0, 0, 0.6),
+        0 0 45px rgba(77, 228, 255, 0.12);
+    overflow: hidden;
+}
+
+.container::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 22px;
+    border: 1px solid rgba(249, 185, 65, 0.25);
+    pointer-events: none;
+    box-shadow: inset 0 0 45px rgba(77, 228, 255, 0.1);
+    z-index: 0;
+}
+
+.container > * {
+    position: relative;
+    z-index: 1;
 }
 
 /* Top Bar */
@@ -70,22 +180,27 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.5rem;
-    background-color: var(--bg-medium);
-    border-bottom: 2px solid var(--border);
+    background-color: var(--panel-bg-strong);
+    border-bottom: 1px solid var(--border-light);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    position: relative;
+    z-index: 2;
+    border-top-left-radius: 22px;
+    border-top-right-radius: 22px;
 }
 
 .logo h1 {
     font-size: 1.5rem;
     font-weight: 700;
-    color: var(--primary);
+    color: var(--gold);
     margin-bottom: 0.25rem;
-    text-shadow: var(--glow-primary);
+    text-shadow: 0 0 18px rgba(249, 185, 65, 0.45);
     letter-spacing: 0.05em;
 }
 
 .logo .subtitle {
     font-size: 0.875rem;
-    color: var(--text-secondary);
+    color: rgba(248, 250, 252, 0.7);
 }
 
 .file-controls {
@@ -97,8 +212,8 @@ body {
 .file-path-input {
     width: 400px;
     padding: 0.5rem 0.75rem;
-    background-color: var(--bg-light);
-    border: 1px solid var(--border);
+    background-color: rgba(12, 18, 32, 0.85);
+    border: 1px solid var(--border-light);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.875rem;
@@ -177,20 +292,27 @@ body {
 .split-container {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 80px);
+    height: calc(100% - 80px);
     overflow: hidden;
+    position: relative;
+    z-index: 1;
+    background-color: transparent;
 }
 
 .top-panels {
     display: flex;
     flex: 1;
     min-height: 0;
+    position: relative;
+    border-bottom: 1px solid rgba(249, 185, 65, 0.25);
 }
 
 .split-horizontal {
     display: flex;
     width: 100%;
     height: 100%;
+    position: relative;
+    backdrop-filter: blur(4px);
 }
 
 /* Split.js Gutter Styling */
@@ -222,8 +344,9 @@ body {
 .editor-panel {
     display: flex;
     flex-direction: column;
-    background-color: var(--bg-medium);
-    border-right: 2px solid var(--border);
+    background-color: var(--panel-bg);
+    border-right: 1px solid var(--border-light);
+    box-shadow: inset -1px 0 0 rgba(249, 185, 65, 0.1);
 }
 
 .panel-header {
@@ -231,14 +354,18 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem 1rem;
-    background-color: var(--bg-light);
-    border-bottom: 1px solid var(--border);
+    background-color: rgba(12, 18, 32, 0.92);
+    border-bottom: 1px solid var(--border-light);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.45);
 }
 
 .panel-header h2,
 .panel-header h3 {
     font-size: 1rem;
     font-weight: 600;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
 }
 
 .header-controls {
@@ -317,13 +444,17 @@ body {
     flex: 1;
     width: 100%;
     height: 100%;
+    border-top: 1px solid rgba(249, 185, 65, 0.12);
+    background: rgba(4, 8, 18, 0.55);
 }
 
 /* BROCKSTON Panel */
 .brockston-panel {
     display: flex;
     flex-direction: column;
-    background-color: var(--bg-medium);
+    background-color: var(--panel-bg);
+    border-left: 1px solid rgba(249, 185, 65, 0.12);
+    backdrop-filter: blur(4px);
 }
 
 .chat-section {
@@ -331,37 +462,38 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border-bottom: 1px solid rgba(249, 185, 65, 0.18);
 }
 
 .chat-log {
     flex: 1;
     overflow-y: auto;
     padding: 1rem;
-    background-color: var(--bg-dark);
+    background-color: rgba(4, 8, 18, 0.6);
 }
 
 .chat-message {
     margin-bottom: 1rem;
     padding: 0.75rem;
-    background-color: var(--bg-medium);
+    background-color: rgba(16, 24, 44, 0.85);
     border-radius: 6px;
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
 .chat-message.user {
-    background-color: var(--bg-light);
+    background-color: rgba(20, 32, 56, 0.95);
     border-left: 3px solid var(--primary);
 }
 
 .chat-message.assistant {
-    background-color: var(--bg-medium);
+    background-color: rgba(12, 22, 38, 0.92);
     border-left: 3px solid var(--success);
 }
 
 .chat-message.system {
-    background-color: var(--bg-light);
-    border-left: 3px solid var(--warning);
+    background-color: rgba(24, 18, 6, 0.85);
+    border-left: 3px solid var(--gold);
     font-style: italic;
 }
 
@@ -381,17 +513,18 @@ body {
 
 /* Input Section */
 .input-section {
-    background-color: var(--bg-light);
-    border-top: 2px solid var(--border);
+    background-color: rgba(10, 16, 30, 0.92);
+    border-top: 1px solid var(--border-light);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .instruction-input {
     width: 100%;
     min-height: 100px;
     padding: 0.75rem;
-    background-color: var(--bg-dark);
+    background-color: rgba(4, 8, 18, 0.9);
     border: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-light);
     color: var(--text-primary);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     font-size: 0.875rem;
@@ -406,6 +539,7 @@ body {
     display: flex;
     gap: 0.5rem;
     padding: 0.75rem;
+    background: rgba(8, 12, 24, 0.8);
 }
 
 .button-group .btn {
@@ -416,15 +550,27 @@ body {
 .terminal-panel {
     display: flex;
     flex-direction: column;
-    background-color: var(--terminal-bg);
-    border-top: 2px solid var(--primary);
-    box-shadow: 0 -4px 20px var(--primary-glow);
+    background-color: var(--panel-bg-strong);
+    border-top: 1px solid var(--border-light);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.55), 0 -2px 12px rgba(249, 185, 65, 0.2);
     min-height: 200px;
+    position: relative;
+}
+
+.terminal-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-top: 1px solid rgba(249, 185, 65, 0.25);
+    border-bottom-left-radius: 22px;
+    border-bottom-right-radius: 22px;
+    pointer-events: none;
+    z-index: 0;
 }
 
 .terminal-panel .panel-header {
-    background-color: var(--bg-medium);
-    border-bottom: 1px solid var(--border);
+    background-color: rgba(10, 18, 34, 0.92);
+    border-bottom: 1px solid var(--border-light);
     padding: 0.5rem 1rem;
     display: flex;
     justify-content: space-between;
@@ -434,7 +580,7 @@ body {
 .terminal-panel .panel-header h2 {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--gold);
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
@@ -448,7 +594,13 @@ body {
     flex: 1;
     padding: 0.5rem;
     overflow: hidden;
-    background-color: var(--terminal-bg);
+    background-color: rgba(0, 0, 0, 0.9);
+    border-top: 1px solid rgba(249, 185, 65, 0.15);
+}
+
+.terminal-panel > * {
+    position: relative;
+    z-index: 1;
 }
 
 /* xterm.js Terminal Customization */
