@@ -73,7 +73,7 @@
         
         /* The Watermark / Crest */
         #watermark {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
             opacity: 0.1; pointer-events: none; z-index: 0;
             /* Assuming local image exists, else fallback text */
             background-image: url('/static/family_crest.png'); 
@@ -247,7 +247,7 @@
         // --- FILE SYSTEM LOGIC ---
         async function loadFiles() {
             try {
-                const res = await fetch(`${API_BASE}/files`);
+                const res = await fetch(`${API_BASE}/files?path=${encodeURIComponent(path)}`);
                 const data = await res.json();
                 
                 fileList.innerHTML = ''; // Clear loading

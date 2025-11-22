@@ -4,6 +4,8 @@ import pty
 import select
 import json
 import logging
+import asyncio
+from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -60,21 +62,31 @@ async def chat_endpoint(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/files")
-async def list_files():
-    """Lists files in the current directory (excluding hidden/system)"""
+async def list_files(path: str = ""):
+    """Lists files in the specified directory (excluding hidden/system)"""
     try:
-        root_dir = "."
+        # Security: prevent directory traversal
+        if ".." in path or path.startswith("/"):
+            raise HTTPException(status_code=400, detail="Invalid path")
+        
+        # Determine directory to list
+        if path:
+            root_dir = path
+        else:
+            root_dir = "."
+        
         files = []
         for item in os.listdir(root_dir):
             if not item.startswith(".") and not item.startswith("__"):
-                if os.path.isfile(item) or os.path.isdir(item):
-                     # Simple categorization
-                    kind = "folder" if os.path.isdir(item) else "file"
+                full_path = os.path.join(root_dir, item)
+                if os.path.isfile(full_path) or os.path.isdir(full_path):
+                    kind = "folder" if os.path.isdir(full_path) else "file"
                     files.append({"name": item, "type": kind})
-        return {"files": files}
+        
+        return {"files": files, "path": path}
     except Exception as e:
         logger.error(f"File Listing Error: {e}")
-        return {"files": []}
+        return {"files": [], "path": path}
 
 @app.get("/api/read_file")
 async def read_file(filename: str):
@@ -83,7 +95,7 @@ async def read_file(filename: str):
         # Security: Basic prevention of directory traversal
         if ".." in filename or filename.startswith("/"):
              raise HTTPException(status_code=400, detail="Invalid filename")
-        
+
         with open(filename, "r", encoding="utf-8") as f:
             content = f.read()
         return {"content": content, "filename": filename}
@@ -91,17 +103,18 @@ async def read_file(filename: str):
         logger.error(f"Read Error: {e}")
         raise HTTPException(status_code=404, detail="File not found or unreadable")
 
-# --- TERMINAL WEBSOCKET (The "Scrubber" Backend) ---
+# --- TERMINAL WEBSOCKET (FIXED VERSION) ---
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()
-    
+    logger.info("Terminal WebSocket connection accepted")
+
     # Create a pseudo-terminal
     master_fd, slave_fd = pty.openpty()
-    
+
     # Start a shell (zsh if available, else bash)
     shell = os.environ.get("SHELL", "/bin/bash")
-    
+
     # Run the process attached to the PTY
     process = subprocess.Popen(
         [shell],
@@ -111,71 +124,96 @@ async def websocket_terminal(websocket: WebSocket):
         stderr=slave_fd,
         universal_newlines=True
     )
-    
-    os.close(slave_fd) # Close slave in parent
 
-    try:
-        while True:
-            # Wait for input from websocket or output from pty
-            # 0.1 timeout for responsiveness
-            await websocket.send_text("") # Keepalive ping mechanism if needed
-            
-            # Check for output from the shell
-            r, w, x = select.select([master_fd], [], [], 0.01)
-            if master_fd in r:
-                output = os.read(master_fd, 10240).decode('utf-8', errors='ignore')
-                if output:
-                    await websocket.send_text(json.dumps({"type": "output", "data": output}))
+    os.close(slave_fd)  # Close slave in parent
+    logger.info(f"Shell process started with PID: {process.pid}")
 
-            # Check for input from the frontend (non-blocking via asyncio technically, 
-            # but here we rely on the receive_text in a loop logic usually. 
-            # To make this truly async concurrent, we'd separate read/write tasks.
-            # For simplicity/stability in this monolith, we use a slightly different approach below)
-            
-            # REVISION: The simple loop blocks. We need asyncio gather or specific logic.
-            # Let's switch to a robust reader/writer task structure.
-            break 
-    except Exception:
-        pass
-    
-    # --- Robust Async Handler ---
-    # Re-accepting logic for clean separation
-    
+    # Task for reading from PTY and sending to websocket
     async def read_from_pty():
-        while True:
-            try:
+        """Read output from the shell and send to websocket"""
+        try:
+            while True:
+                # Non-blocking check for data
                 r, _, _ = select.select([master_fd], [], [], 0.1)
                 if master_fd in r:
-                    output = os.read(master_fd, 10240).decode('utf-8', errors='ignore')
-                    if output:
-                        await websocket.send_text(json.dumps({"type": "output", "data": output}))
+                    try:
+                        output = os.read(master_fd, 10240).decode('utf-8', errors='ignore')
+                        if output:
+                            await websocket.send_text(json.dumps({"type": "output", "data": output}))
+                    except OSError as e:
+                        logger.error(f"PTY read error: {e}")
+                        break
                 else:
-                    # Brief sleep to yield control
-                    import asyncio
+                    # Yield control to event loop
                     await asyncio.sleep(0.01)
-            except Exception as e:
-                break
+                    
+                # Check if process is still alive
+                if process.poll() is not None:
+                    logger.info("Shell process terminated")
+                    break
+        except Exception as e:
+            logger.error(f"Error in read_from_pty: {e}")
+        finally:
+            logger.info("read_from_pty task finished")
 
+    # Task for receiving from websocket and writing to PTY
     async def write_to_pty():
-        while True:
-            try:
+        """Receive input from websocket and write to shell"""
+        try:
+            while True:
                 data = await websocket.receive_text()
-                payload = json.loads(data)
-                if payload.get("type") == "input":
-                    cmd = payload.get("data")
-                    os.write(master_fd, cmd.encode())
-                elif payload.get("type") == "resize":
-                    # Handle resize if needed, skipping for now
-                    pass
-            except WebSocketDisconnect:
-                process.terminate()
-                break
-            except Exception:
-                break
+                
+                # Handle empty keepalive messages
+                if not data or data == '""':
+                    continue
+                    
+                try:
+                    payload = json.loads(data)
+                    if payload.get("type") == "input":
+                        cmd = payload.get("data", "")
+                        os.write(master_fd, cmd.encode())
+                    elif payload.get("type") == "resize":
+                        # Handle terminal resize if needed in the future
+                        pass
+                except json.JSONDecodeError:
+                    logger.warning(f"Invalid JSON received: {data}")
+                except OSError as e:
+                    logger.error(f"PTY write error: {e}")
+                    break
+        except WebSocketDisconnect:
+            logger.info("WebSocket disconnected")
+        except Exception as e:
+            logger.error(f"Error in write_to_pty: {e}")
+        finally:
+            logger.info("write_to_pty task finished")
 
-    import asyncio
-    await asyncio.gather(read_from_pty(), write_to_pty())
+    # Run both tasks concurrently
+    try:
+        await asyncio.gather(
+            read_from_pty(),
+            write_to_pty(),
+            return_exceptions=True
+        )
+    except Exception as e:
+        logger.error(f"Terminal session error: {e}")
+    finally:
+        # Cleanup
+        try:
+            process.terminate()
+            process.wait(timeout=1)
+        except:
+            process.kill()
+        try:
+            os.close(master_fd)
+        except:
+            pass
+        logger.info("Terminal session cleaned up")
 
-# --- STATIC FILES SERVING ---
-# This serves the frontend directory at root
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
+# --- STATIC FILES SERVING (FIXED WITH ABSOLUTE PATH) ---
+# Get the absolute path to the frontend directory
+backend_dir = Path(__file__).parent
+frontend_dir = backend_dir.parent / "frontend"
+
+logger.info(f"Serving static files from: {frontend_dir}")
+
+app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

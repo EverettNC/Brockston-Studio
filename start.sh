@@ -20,6 +20,12 @@ if ! python3 -c "import fastapi" &> /dev/null; then
     pip install -r requirements.txt
 fi
 
+# Load .env file if it exists
+if [ -f .env ]; then
+    echo "Loading environment variables from .env"
+    export $(grep -v '^#' .env | grep -v '^$' | xargs)
+fi
+
 # Set default environment variables if not already set
 export BROCKSTON_HOST="${BROCKSTON_HOST:-127.0.0.1}"
 export BROCKSTON_PORT="${BROCKSTON_PORT:-7777}"
@@ -29,6 +35,7 @@ echo "Configuration:"
 echo "  Host: $BROCKSTON_HOST"
 echo "  Port: $BROCKSTON_PORT"
 echo "  BROCKSTON URL: $BROCKSTON_BASE_URL"
+echo "  OpenAI Key: ${OPENAI_API_KEY:0:20}..." 
 echo ""
 echo "Starting server..."
 echo "Open http://localhost:$BROCKSTON_PORT in your browser"
