@@ -7,9 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.0/split.min.js"></script>
 
 <style>
-  /* --- GLOBAL RESET --- */
   * { box-sizing: border-box; }
-
   :root {
     --void-black: #000000;
     --panel-black: #080808;
@@ -18,66 +16,37 @@
     --text-main: #e0e0e0;
     --font-term: 'Menlo', 'Consolas', monospace;
   }
-
   body {
     margin: 0; height: 100vh; background-color: #111; 
     color: var(--text-main); font-family: var(--font-term);
     overflow: hidden; display: flex; justify-content: center; align-items: center; padding: 15px;
   }
-
   .studio-container {
     width: 100%; height: 100%; background: var(--void-black);
     border: 2px solid var(--neon-orange);
-    display: flex; 
-    flex-direction: column;
+    display: flex; flex-direction: column;
     box-shadow: 0 0 30px rgba(255, 95, 31, 0.1);
   }
-
-  /* HEADER */
   .header {
-    height: 40px;
-    border-bottom: 1px solid var(--neon-orange); display: flex;
+    height: 40px; border-bottom: 1px solid var(--neon-orange); display: flex;
     align-items: center; justify-content: space-between; padding: 0 20px;
     background: #020202; font-weight: bold; letter-spacing: 3px;
-    color: var(--neon-orange); text-transform: uppercase;
-    flex-shrink: 0;
+    color: var(--neon-orange); text-transform: uppercase; flex-shrink: 0;
   }
-
-  /* --- MIDDLE AREA (SLIDING) --- */
   .middle-area {
-    display: flex; 
-    flex: 1; 
-    overflow: hidden;
-    height: calc(100% - 190px); 
+    display: flex; flex: 1; overflow: hidden; height: calc(100% - 190px); 
   }
-
-  /* THE SLIDER LINES (GUTTERS) */
   .gutter {
-    background-color: #111;
-    cursor: col-resize;
-    transition: background-color 0.2s;
-    border-left: 1px solid #333;
-    border-right: 1px solid #333;
+    background-color: #111; cursor: col-resize;
+    border-left: 1px solid #333; border-right: 1px solid #333;
   }
-  .gutter:hover {
-    background-color: var(--neon-orange);
-    border-color: var(--neon-orange);
-  }
-
-  /* COL 1: TOOLS */
+  .gutter:hover { background-color: var(--neon-orange); }
   .col-tools {
-    background: var(--panel-black);
-    display: flex; flex-direction: column; align-items: center; padding-top: 25px;
-    overflow: hidden;
+    background: var(--panel-black); display: flex; flex-direction: column; align-items: center; padding-top: 25px; overflow: hidden;
   }
   .tool-icon { font-size: 1.5rem; color: #555; margin-bottom: 35px; cursor: pointer; transition: 0.2s; }
   .tool-icon:hover { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
-  
-  /* COL 2: FILES */
-  .col-files {
-    background: var(--panel-black);
-    padding: 15px; overflow-y: auto;
-  }
+  .col-files { background: var(--panel-black); padding: 15px; overflow-y: auto; }
   .section-title {
     color: var(--theme-cyan); font-size: 0.75rem; border-bottom: 1px solid #333;
     padding-bottom: 8px; margin-bottom: 15px; letter-spacing: 1px; white-space: nowrap;
@@ -86,12 +55,9 @@
   li { padding: 8px 0; cursor: pointer; color: #999; font-size: 0.9rem; display: flex; align-items: center; white-space: nowrap;}
   li:hover { color: white; text-shadow: 0 0 5px white; }
   li i { width: 20px; margin-right: 8px; text-align: center; }
-
-  /* COL 3: CENTER STAGE */
   .col-center {
     background: radial-gradient(circle at center, #1a0500 0%, #000000 90%);
-    position: relative; 
-    overflow: hidden;
+    position: relative; overflow: hidden;
   }
   .family-crest {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
@@ -103,14 +69,10 @@
     padding: 20px; font-family: var(--font-term); font-size: 0.95rem;
     resize: none; outline: none; line-height: 1.6; display: block; 
   }
-
-  /* COL 4: AI PANEL */
   .col-ai { background: var(--panel-black); display: flex; flex-direction: column; }
   .chat-log { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95rem; line-height: 1.5; }
-  
   .input-area {
-    border-top: 1px solid var(--neon-orange);
-    padding: 15px; background: #000;
+    border-top: 1px solid var(--neon-orange); padding: 15px; background: #000;
     display: flex; gap: 10px; align-items: flex-end;
   }
   textarea {
@@ -124,13 +86,9 @@
     border: none; height: 50px; font-weight: bold; cursor: pointer; border-radius: 2px;
   }
   button:hover { background: #ff7b47; }
-
-  /* BOTTOM: TERMINAL */
   .terminal-panel {
-    height: 150px;
-    border-top: 2px solid var(--neon-orange); background: #000;
-    padding: 10px 20px; color: #27c93f; font-size: 0.9rem; overflow-y: auto;
-    flex-shrink: 0;
+    height: 150px; border-top: 2px solid var(--neon-orange); background: #000;
+    padding: 10px 20px; color: #27c93f; font-size: 0.9rem; overflow-y: auto; flex-shrink: 0;
   }
   .cli-input {
     background: transparent; border: none; color: var(--neon-orange);
@@ -157,9 +115,8 @@
     <div class="col-files" id="col-2">
       <div class="section-title">PROJECT EXPLORER</div>
       <ul id="file-list"><li>[Connecting...]</li></ul>
-      <div class="section-title" style="margin-top: 30px;">MEMORY CORE</div>
-      <ul><li><i class="fa-solid fa-brain" style="color: gold;"></i> StillHere_Protocol</li></ul>
-    </div>
+      
+      </div>
 
     <div class="col-center" id="col-3">
       <img src="/static/family_crest.png" class="family-crest" alt="Family Crest" id="crestImg" onerror="tryNextImage()">
@@ -189,26 +146,17 @@
 </div>
 
 <script>
-    // --- 1. SLIDER LOGIC ---
     Split(['#col-1', '#col-2', '#col-3', '#col-4'], {
-        sizes: [5, 15, 50, 30], // Percentages
-        minSize: [60, 150, 300, 250], // Pixels
-        gutterSize: 2,
-        cursor: 'col-resize'
+        sizes: [5, 15, 50, 30], minSize: [60, 150, 300, 250], gutterSize: 2, cursor: 'col-resize'
     });
 
-    // --- IMAGE FALLBACK ---
     const img = document.getElementById('crestImg');
     const attempts = ['/static/family_crest.jpg', '/static/family_crest.jpeg', '/static/Family_Crest.jpg'];
     let attemptIdx = 0;
     function tryNextImage() {
-        if (attemptIdx < attempts.length) {
-            img.src = attempts[attemptIdx];
-            attemptIdx++;
-        }
+        if (attemptIdx < attempts.length) { img.src = attempts[attemptIdx]; attemptIdx++; }
     }
 
-    // --- APP LOGIC ---
     const fileList = document.getElementById('file-list');
     const codeEditor = document.getElementById('code-editor');
     const qaLog = document.getElementById('qaLog');
@@ -256,16 +204,21 @@
         brockstonInput.value = '';
         qaLog.innerHTML += `<div style="margin-top:15px; color:#888;">YOU: ${text}</div>`;
         qaLog.scrollTop = qaLog.scrollHeight;
+        
         try {
             const response = await fetch('/api/brockston/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ messages: [{ role: "user", content: text }], model: "brockston" })
             });
+            
+            if (!response.ok) throw new Error("API Error " + response.status);
+            
             const data = await response.json();
             qaLog.innerHTML += `<div style="color: var(--theme-cyan); margin-top:5px;">[BROCKSTON]: ${data.reply}</div>`;
         } catch (e) {
-            qaLog.innerHTML += `<div style="color: red; margin-top:5px;">[ERROR]: Link Failed</div>`;
+            console.error(e);
+            qaLog.innerHTML += `<div style="color: red; margin-top:5px;">[ERROR]: ${e.message}</div>`;
         }
         qaLog.scrollTop = qaLog.scrollHeight;
     }
@@ -274,7 +227,6 @@
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendToBrockston(); }
     });
 
-    // --- TERMINAL CLEANER (THE FIX) ---
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
     
@@ -283,19 +235,13 @@
         if (msg.type === 'output') {
             let raw = msg.data;
             
-            // FILTER 1: Remove standard ANSI colors (Red, Green, Bold)
-            let clean = raw.replace(/\x1B\[[0-9;]*m/g, '');
-
-            // FILTER 2: Remove ZSH Shell Junk (The ?2004h stuff)
-            clean = clean.replace(/\x1B\[\?[0-9;]*[a-zA-Z]/g, '');
-
-            // FILTER 3: Remove weird percentage signs at end of line
-            clean = clean.replace(/%\s*$/, '');
-
-            // Convert newlines
+            // TERMINAL SCRUBBER (FIXED)
+            let clean = raw.replace(/\x1B\[[0-9;]*m/g, ''); // Colors
+            clean = clean.replace(/\x1B\][0-9];.*?\x07/g, ''); // OSC Codes (The ]7;file garbage)
+            clean = clean.replace(/\x1B\[\?[0-9;]*[a-zA-Z]/g, ''); // ZSH Modes
+            clean = clean.replace(/%\s*$/, ''); 
             clean = clean.replace(/\n/g, '<br>');
             
-            // Only append if there's real text
             if (clean.trim().length > 0 || clean.includes('<br>')) {
                 termOutput.innerHTML += `<span>${clean}</span>`;
                 const panel = document.querySelector('.terminal-panel');
