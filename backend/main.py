@@ -52,14 +52,28 @@ async def health_check():
 
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
-    """Direct line to OpenAI via ai_client.py"""
+    """Routes to UltimateEv Code Mechanic for hillbilly-to-tech translation"""
+    import httpx
     try:
-        logger.info(f"AI Request received: {request.message}")
-        response_text = get_ai_response(request.message)
-        return {"response": response_text}
+        logger.info(f"Sending to UltimateEv: {request.message}")
+        
+        # Call UltimateEv API
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                "http://localhost:5174/api/translate",
+                json={"message": request.message}
+            )
+            data = response.json()
+            return {"response": f"[ULTIMATE_EV]: {data['response']}"}
+            
     except Exception as e:
-        logger.error(f"AI Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"UltimateEv Error: {e}")
+        # Fallback to regular AI
+        try:
+            response_text = get_ai_response(request.message)
+            return {"response": f"[BROCKSTON]: {response_text}"}
+        except:
+            raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/files")
 async def list_files(path: str = ""):
