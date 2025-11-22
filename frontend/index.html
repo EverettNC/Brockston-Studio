@@ -2,285 +2,283 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Brockston Studio - TRACER TEST</title>
+<title>Brockston Studio - Pro</title>
 <style>
   :root {
-    --gold: #FFC107; 
-    --bg: #050505;   
-    --panel-bg: rgba(15, 15, 15, 0.95);
-    --cyan: #00d2ff;
+    --theme-gold: #C0A062; 
+    --theme-cyan: #00B4D8;
+    --bg-dark: #0a0a0a;
+    --panel-bg: #111111;
+    --border-color: #333;
+    --text-primary: #e0e0e0;
+    --text-secondary: #888;
   }
 
   body {
     margin: 0;
     height: 100vh;
-    background-color: var(--bg);
-    color: var(--gold);
-    font-family: 'Courier New', monospace; 
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: 'Menlo', 'Consolas', monospace; 
     overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
   }
 
-  /* THE WINDOW */
+  /* MAIN CONTAINER */
   .studio-container {
     width: 99vw;
     height: 98vh;
-    border: 1px solid var(--gold);
-    border-radius: 8px;
+    border: 1px solid var(--border-color);
     display: grid;
-    grid-template-rows: 40px 1fr 200px; /* Header | Middle | Terminal */
-    box-shadow: 0 0 20px rgba(255, 193, 7, 0.15);
-    background: var(--bg);
+    grid-template-rows: 30px 1fr 200px; /* Header | Middle | Terminal */
+    background: var(--bg-dark);
   }
 
-  /* HEADER */
+  /* HEADER - Sleek and minimal */
   .header {
-    border-bottom: 1px solid var(--gold);
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    padding: 0 15px;
-    background: #111;
+    padding: 0 10px;
+    background: #000;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    color: var(--theme-gold);
     font-weight: bold;
-    letter-spacing: 1.5px;
   }
-  .traffic-lights { display: flex; gap: 8px; margin-right: 20px; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; }
-  .red { background: #ff5f56; } .yellow { background: #ffbd2e; } .green { background: #27c93f; }
 
   /* MIDDLE AREA - 4 COLUMNS */
   .middle-area {
     display: grid;
-    /* 1. Tools (Narrow) | 2. Files (Medium) | 3. Center (Wide) | 4. Q&A (Medium) */
-    grid-template-columns: 60px 220px 1fr 300px; 
+    grid-template-columns: 50px 250px 1fr 350px; 
     overflow: hidden;
+    background: var(--panel-bg);
   }
 
-  /* COL 1: EXTREME LEFT (TOOLS) */
+  /* COL 1: TOOLS (Professional Icons) */
   .col-tools {
-    border-right: 1px solid #333;
-    background: #111;
+    border-right: 1px solid var(--border-color);
+    background: #050505;
     display: flex;
     flex-direction: column;
     align-items: center;
     padding-top: 15px;
+    color: var(--text-secondary);
   }
   .tool-icon {
-    width: 30px; height: 30px;
-    margin-bottom: 20px;
-    border: 1px solid var(--gold);
-    border-radius: 4px;
-    display: flex; justify-content: center; align-items: center;
-    cursor: pointer;
-    font-size: 1.2rem;
+    font-size: 1.2rem; margin-bottom: 25px; cursor: pointer; transition: color 0.2s;
   }
-  .tool-icon:hover { background: var(--gold); color: black; }
+  .tool-icon:hover { color: var(--theme-cyan); }
 
-  /* COL 2: INSIDE LEFT (FILES) */
+  /* COL 2: FILES */
   .col-files {
-    border-right: 1px solid var(--gold);
+    border-right: 1px solid var(--border-color);
     padding: 10px;
-    background: var(--panel-bg);
     font-size: 0.85rem;
     overflow-y: auto;
   }
-  .folder { color: var(--cyan); margin-bottom: 5px; font-weight: bold; }
-  .file { margin-left: 15px; color: #bbb; cursor: pointer; margin-bottom: 3px; }
-  .file:hover { color: white; text-decoration: underline; }
+  .section-title { color: var(--theme-cyan); font-size: 0.75rem; margin-bottom: 10px; text-transform: uppercase; }
+  .file-item { margin-left: 10px; color: var(--text-secondary); cursor: pointer; margin-bottom: 5px; display: flex; align-items: center;}
+  .file-item:hover { color: var(--text-primary); }
+  .file-icon { margin-right: 8px; font-size: 0.9rem; }
 
-  /* COL 3: CENTER (WORKSPACE + CREST) */
+  /* COL 3: CENTER WORKSPACE */
   .col-center {
     position: relative;
-    background: radial-gradient(circle at center, rgba(0, 20, 40, 0.5) 0%, transparent 80%);
+    background: #000;
     display: flex;
-    flex-direction: column;
-    padding: 20px;
+    justify-content: center;
+    align-items: center;
     overflow: hidden;
+    border-right: 1px solid var(--border-color);
   }
   
-  /* The Crest - Acts as a Watermark/Background */
   .crest-bg {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    max-width: 70%;
-    max-height: 70%;
-    opacity: 0.4; /* Faded so you can read text over it */
-    z-index: 0;
-    filter: drop-shadow(0 0 20px var(--cyan));
-    pointer-events: none; /* Let clicks pass through to text */
-  }
-  
-  /* The "Corrections" Overlay */
-  .workspace-content {
-    z-index: 1; /* Sits on top of the crest */
-    color: #eee;
-    font-family: 'Menlo', monospace;
-    white-space: pre-wrap;
+    max-width: 60%;
+    max-height: 60%;
+    opacity: 0.8; 
+    filter: grayscale(30%) contrast(120%); /* Professional look */
+    border-radius: 50%;
+    box-shadow: 0 0 30px rgba(0, 180, 216, 0.1);
   }
 
-  /* COL 4: EXTREME RIGHT (Q&A) */
+  /* COL 4: Q&A PANEL (Fixed) */
   .col-qa {
-    border-left: 1px solid var(--gold);
     background: var(--panel-bg);
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
   .qa-header {
-    padding: 10px;
-    border-bottom: 1px solid #333;
-    text-align: center;
-    color: var(--cyan);
-    font-weight: bold;
+    padding: 10px; border-bottom: 1px solid var(--border-color);
+    text-align: left; color: var(--theme-cyan); font-size: 0.8rem;
   }
   .qa-log {
-    flex-grow: 1;
-    padding: 15px;
-    overflow-y: auto;
-    font-size: 0.9rem;
+    flex-grow: 1; padding: 15px; overflow-y: auto; font-size: 0.85rem;
   }
   .qa-bubble {
-    margin-bottom: 15px;
-    padding: 10px;
-    border: 1px solid #444;
-    border-radius: 6px;
-    background: rgba(0,0,0,0.3);
+    margin-bottom: 15px; padding: 10px; border-left: 2px solid #444; background: rgba(255,255,255,0.03);
   }
+  /* THE NEW INPUT AREA FOR BROCKSTON */
+  .qa-input-area {
+    border-top: 1px solid var(--border-color);
+    padding: 10px;
+    display: flex;
+    background: #050505;
+  }
+  .qa-text-input {
+    flex-grow: 1;
+    background: #111;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: inherit;
+    padding: 8px;
+    resize: none;
+    height: 40px;
+    outline: none;
+  }
+  .qa-text-input:focus { border-color: var(--theme-cyan); }
+  .qa-send-btn {
+    margin-left: 10px;
+    background: var(--theme-cyan);
+    color: #000;
+    border: none;
+    padding: 0 15px;
+    cursor: pointer;
+    font-weight: bold;
+    font-family: inherit;
+  }
+  .qa-send-btn:hover { opacity: 0.9; }
+
 
   /* BOTTOM: TERMINAL */
   .terminal-panel {
-    border-top: 1px solid var(--gold);
+    border-top: 1px solid var(--border-color);
     background: #000;
-    padding: 10px;
+    padding: 5px 10px;
     display: flex;
     flex-direction: column;
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
+  .terminal-header { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 5px; }
   .input-line { display: flex; align-items: center; height: 100%; }
+  .prompt-sign { color: var(--theme-green); margin-right: 8px; }
   .cli-input {
-    background: transparent; border: none; color: white;
-    font-family: inherit; font-size: 1rem; width: 100%;
-    outline: none; margin-left: 10px;
+    background: transparent; border: none; color: var(--theme-gold);
+    font-family: inherit; font-size: 0.9rem; width: 100%;
+    outline: none;
   }
-
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
 <div class="studio-container">
   <div class="header">
-    <div class="traffic-lights">
-      <div class="dot red"></div><div class="dot yellow"></div><div class="dot green"></div>
-    </div>
-    <div style="flex-grow:1; text-align:center;">BROCKSTON STUDIO</div>
+    BROCKSTON STUDIO // PROFESSIONAL EDITION
   </div>
 
   <div class="middle-area">
     
     <div class="col-tools">
-      <div class="tool-icon" title="Settings">⚙️</div>
-      <div class="tool-icon" title="Search">🔍</div>
-      <div class="tool-icon" title="Extensions">🧩</div>
-      <div class="tool-icon" title="Git">🐙</div>
+      <i class="fa-solid fa-terminal tool-icon" title="Terminal"></i>
+      <i class="fa-solid fa-code-branch tool-icon" title="Git Control"></i>
+      <i class="fa-solid fa-magnifying-glass tool-icon" title="Search"></i>
+      <i class="fa-solid fa-gear tool-icon" title="Settings"></i>
     </div>
 
     <div class="col-files">
-      <div class="folder">> PROJECT_ROOT</div>
-      <div class="file">📄 app.py</div>
-      <div class="file">📄 NeuroSymbolicExpert.py</div>
-      <div class="folder">> STATIC</div>
-      <div class="file">🖼️ family_crest.jpg</div>
-      <div class="folder">> MEMORY</div>
-      <div class="file">🧠 StillHere_Protocol</div>
+      <div class="section-title">Project Explorer</div>
+      <div class="file-item"><i class="fa-regular fa-folder file-icon"></i> backend/</div>
+      <div class="file-item"><i class="fa-regular fa-folder file-icon"></i> frontend/</div>
+      <div class="file-item"><i class="fa-brands fa-python file-icon"></i> app.py</div>
+      <div class="file-item"><i class="fa-regular fa-image file-icon"></i> family_crest.jpg</div>
+      <div class="section-title" style="margin-top: 20px;">Memory Core</div>
+      <div class="file-item"><i class="fa-solid fa-brain file-icon" style="color:var(--theme-gold)"></i> StillHere_Protocol</div>
     </div>
 
     <div class="col-center">
       <img src="static/family_crest.jpg" class="crest-bg" alt="Family Crest">
-      
-      <div class="workspace-content" id="centerDisplay">
-        <div style="color:var(--gold); text-align:center; margin-top:20px;">
-          [SYSTEM READY]<br>
-          Awaiting corrections...
-        </div>
-      </div>
     </div>
 
     <div class="col-qa">
       <div class="qa-header">ASK BROCKSTON / ULTIMATE_EV</div>
       <div class="qa-log" id="qaLog">
-        <div class="qa-bubble">
-          <span style="color:var(--gold)">[BROCKSTON]:</span><br>
-          I am ready to assist. Select a file or ask a question.
+        <div class="qa-bubble" style="border-color: var(--theme-cyan);">
+          <span style="color:var(--theme-cyan)">[SYSTEM]:</span> Neural Link Active. Ready for queries.
         </div>
+      </div>
+      
+      <div class="qa-input-area">
+          <textarea class="qa-text-input" id="brockstonInput" placeholder="Ask a question... (Press Enter to send)"></textarea>
+          <button class="qa-send-btn" id="sendBtn">SEND</button>
       </div>
     </div>
 
   </div>
 
   <div class="terminal-panel" onclick="document.getElementById('termInput').focus()">
-    <div style="color:#666; font-size:0.8rem; margin-bottom:5px;">TERMINAL / DIRECT LINK</div>
+    <div class="terminal-header">GITHUB LINK / SYSTEM TERMINAL</div>
     <div class="input-line">
-      <span style="color:#27c93f">➜</span> 
-      <input type="text" class="cli-input" id="termInput" placeholder="Command..." autofocus>
+      <span style="color:#27c93f; margin-right: 10px;">➜</span> 
+      <input type="text" class="cli-input" id="termInput" placeholder="Enter command..." autofocus>
     </div>
   </div>
 </div>
 
 <script>
-  const input = document.getElementById('termInput');
-  const centerDisplay = document.getElementById('centerDisplay');
+  const termInput = document.getElementById('termInput');
+  const brockstonInput = document.getElementById('brockstonInput');
+  const sendBtn = document.getElementById('sendBtn');
   const qaLog = document.getElementById('qaLog');
 
-  // Focus on input
-  document.addEventListener('click', () => input.focus());
+  // --- Terminal Handling ---
+  termInput.addEventListener('keypress', async (e) => {
+    if (e.key === 'Enter' && termInput.value) {
+      const text = termInput.value;
+      termInput.value = '';
+      // Here we would send to the backend terminal endpoint
+      console.log(`Terminal command: ${text}`);
+    }
+  });
 
-  input.addEventListener('keypress', async (e) => {
-    if (e.key === 'Enter') {
-      const text = input.value;
+  // --- Brockston Q&A Handling ---
+  function sendToBrockston() {
+      const text = brockstonInput.value;
       if(!text) return;
-      
-      // 1. Clear Input
-      input.value = '';
+      brockstonInput.value = '';
 
-      // 2. Determine where the output goes
-      // If it's a question (contains "?"), goes to Right Panel
-      // If it's code/command, goes to Center Panel
-      const isQuestion = text.includes('?');
+      // 1. Show User Question
+      qaLog.innerHTML += `
+        <div class="qa-bubble" style="border-color:#555;">
+          <span style="color:#aaa">YOU:</span> ${text}
+        </div>
+      `;
+      qaLog.scrollTop = qaLog.scrollHeight;
 
-      if (isQuestion) {
-         // Send to Right Panel (Q&A)
-         qaLog.innerHTML += `
-           <div class="qa-bubble" style="border-color:#444;">
-             <span style="color:#aaa">YOU:</span> ${text}
-           </div>
-         `;
-         // Mock Response
-         setTimeout(() => {
+      // 2. Simulate Response (Replace with actual fetch call later)
+      setTimeout(() => {
            qaLog.innerHTML += `
-             <div class="qa-bubble" style="border-color:var(--cyan);">
-               <span style="color:var(--cyan)">[ULTIMATE_EV]:</span> Analyzing... <br>
-               Here is the insight regarding: "${text}"
+             <div class="qa-bubble" style="border-color:var(--theme-cyan);">
+               <span style="color:var(--theme-cyan)">[BROCKSTON]:</span> Analyzing request... <br>
+               Acknowledgement received.
              </div>
            `;
            qaLog.scrollTop = qaLog.scrollHeight;
-         }, 500);
+      }, 600);
+  }
 
-      } else {
-         // Send to Center (Corrections/Work)
-         centerDisplay.innerHTML = `
-           <div style="color:#fff; background:rgba(0,0,0,0.6); padding:10px; border-radius:4px;">
-             <span style="color:#27c93f">➜ EXEC:</span> ${text}<br><br>
-             [Running Module...]<br>
-             [Success]
-           </div>
-         `;
+  brockstonInput.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault(); // Prevents new line
+          sendToBrockston();
       }
-      
-      // (Optional) Send to backend via fetch('/api/derek_direct') here...
-    }
   });
-</script>
 
+  sendBtn.addEventListener('click', sendToBrockston);
+
+</script>
 </body>
 </html>
