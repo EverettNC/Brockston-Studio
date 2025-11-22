@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>BROCKSTON STUDIO // PROFESSIONAL</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.0/split.min.js"></script>
+
 <style>
   /* --- GLOBAL RESET --- */
   * { box-sizing: border-box; }
@@ -26,37 +28,53 @@
   .studio-container {
     width: 100%; height: 100%; background: var(--void-black);
     border: 2px solid var(--neon-orange);
-    display: grid; grid-template-rows: 40px 1fr 150px; 
+    display: flex; 
+    flex-direction: column;
     box-shadow: 0 0 30px rgba(255, 95, 31, 0.1);
   }
 
-  /* HEADER */
+  /* HEADER (Fixed Height) */
   .header {
+    height: 40px;
     border-bottom: 1px solid var(--neon-orange); display: flex;
     align-items: center; justify-content: space-between; padding: 0 20px;
     background: #020202; font-weight: bold; letter-spacing: 3px;
     color: var(--neon-orange); text-transform: uppercase;
+    flex-shrink: 0;
   }
 
-  /* --- MIDDLE AREA LAYOUT (Fixed Cutoffs) --- */
+  /* --- MIDDLE AREA (FLEXBOX FOR SLIDING) --- */
   .middle-area {
-    display: grid; 
-    /* Fixed widths for sides, Flex for center */
-    grid-template-columns: 60px 250px 1fr 400px; 
+    display: flex; /* Flex allows Split.js to resize widths */
+    flex: 1; /* Takes all remaining height */
     overflow: hidden;
+    height: calc(100% - 190px); /* Subtract header + terminal height */
+  }
+
+  /* DRAG HANDLES (GUTTERS) */
+  .gutter {
+    background-color: #222;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    cursor: col-resize;
+    transition: background-color 0.2s;
+  }
+  .gutter:hover {
+    background-color: var(--neon-orange); /* Lights up when you grab it */
   }
 
   /* COL 1: TOOLS */
   .col-tools {
-    border-right: 1px solid var(--neon-orange); background: var(--panel-black);
+    background: var(--panel-black);
     display: flex; flex-direction: column; align-items: center; padding-top: 25px;
+    overflow: hidden;
   }
   .tool-icon { font-size: 1.5rem; color: #555; margin-bottom: 35px; cursor: pointer; transition: 0.2s; }
   .tool-icon:hover { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
   
   /* COL 2: FILES */
   .col-files {
-    border-right: 1px solid var(--neon-orange); background: var(--panel-black);
+    background: var(--panel-black);
     padding: 15px; overflow-y: auto;
   }
   .section-title {
@@ -64,54 +82,35 @@
     padding-bottom: 8px; margin-bottom: 15px; letter-spacing: 1px; white-space: nowrap;
   }
   ul { list-style: none; padding: 0; margin: 0; }
-  li { padding: 8px 0; cursor: pointer; color: #999; font-size: 0.9rem; display: flex; align-items: center; }
+  li { padding: 8px 0; cursor: pointer; color: #999; font-size: 0.9rem; display: flex; align-items: center; white-space: nowrap;}
   li:hover { color: white; text-shadow: 0 0 5px white; }
   li i { width: 20px; margin-right: 8px; text-align: center; }
 
-  /* --- COL 3: CENTER STAGE (WATERMARK LOGIC) --- */
+  /* --- COL 3: CENTER STAGE --- */
   .col-center {
     background: radial-gradient(circle at center, #1a0500 0%, #000000 90%);
-    position: relative; /* Parent for absolute positioning */
-    border-right: 1px solid var(--neon-orange);
+    position: relative; 
     overflow: hidden;
   }
 
-  /* The Crest (Background Layer) */
+  /* Watermark */
   .family-crest {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 350px; 
-    opacity: 0.15; /* FADED WATERMARK */
-    z-index: 0; /* Sits behind everything */
-    pointer-events: none; /* Let clicks pass through */
-    filter: grayscale(20%);
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 350px; opacity: 0.15; z-index: 0; pointer-events: none; filter: grayscale(20%);
   }
 
-  /* The Code Editor (Foreground Layer) */
+  /* Code Editor */
   #code-editor {
-    position: relative;
-    z-index: 1; /* Sits on top */
-    width: 100%; 
-    height: 100%;
-    background: transparent; /* SEE-THROUGH */
-    border: none; 
-    color: #e0e0e0;
-    padding: 20px; 
-    font-family: var(--font-term); 
-    font-size: 0.95rem;
-    resize: none; 
-    outline: none; 
-    line-height: 1.6;
-    display: block; /* Always there, waiting for input */
+    position: relative; z-index: 1; width: 100%; height: 100%;
+    background: transparent; border: none; color: #e0e0e0;
+    padding: 20px; font-family: var(--font-term); font-size: 0.95rem;
+    resize: none; outline: none; line-height: 1.6; display: block; 
   }
 
   /* COL 4: AI PANEL */
   .col-ai { background: var(--panel-black); display: flex; flex-direction: column; }
   .chat-log { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95rem; line-height: 1.5; }
   
-  /* INPUT AREA */
   .input-area {
     border-top: 1px solid var(--neon-orange);
     padding: 15px; background: #000;
@@ -123,17 +122,18 @@
     border-radius: 4px; height: 50px;
   }
   textarea:focus { border-color: var(--neon-orange); }
-  
   button {
     width: 90px; flex-shrink: 0; background: var(--neon-orange); color: #000;
     border: none; height: 50px; font-weight: bold; cursor: pointer; border-radius: 2px;
   }
   button:hover { background: #ff7b47; }
 
-  /* BOTTOM: TERMINAL */
+  /* BOTTOM: TERMINAL (Fixed Height) */
   .terminal-panel {
+    height: 150px;
     border-top: 2px solid var(--neon-orange); background: #000;
     padding: 10px 20px; color: #27c93f; font-size: 0.9rem; overflow-y: auto;
+    flex-shrink: 0;
   }
   .cli-input {
     background: transparent; border: none; color: var(--neon-orange);
@@ -150,26 +150,26 @@
   </div>
 
   <div class="middle-area">
-    <div class="col-tools">
+    <div class="col-tools" id="col-1">
       <i class="fa-solid fa-terminal tool-icon" title="Terminal"></i>
       <i class="fa-solid fa-code-branch tool-icon" title="Git"></i>
       <i class="fa-solid fa-magnifying-glass tool-icon" title="Search"></i>
       <i class="fa-solid fa-gear tool-icon" title="Settings" style="margin-top: auto;"></i>
     </div>
 
-    <div class="col-files">
+    <div class="col-files" id="col-2">
       <div class="section-title">PROJECT EXPLORER</div>
       <ul id="file-list"><li>[Connecting...]</li></ul>
       <div class="section-title" style="margin-top: 30px;">MEMORY CORE</div>
       <ul><li><i class="fa-solid fa-brain" style="color: gold;"></i> StillHere_Protocol</li></ul>
     </div>
 
-    <div class="col-center">
+    <div class="col-center" id="col-3">
       <img src="/static/family_crest.jpg" class="family-crest" alt="Family Crest" id="crestImg" onerror="tryNextImage()">
       <textarea id="code-editor" spellcheck="false" placeholder="// Select a file to begin..."></textarea>
     </div>
 
-    <div class="col-ai">
+    <div class="col-ai" id="col-4">
       <div class="section-title" style="padding: 15px 20px 0 20px; margin-bottom: 0; border: none;">ASK BROCKSTON / ULTIMATE_EV</div>
       <div class="chat-log" id="qaLog">
         <div style="color: var(--theme-cyan);">[SYSTEM]: Neural Link Active.</div>
@@ -192,6 +192,14 @@
 </div>
 
 <script>
+    // --- 1. INITIALIZE SLIDING COLUMNS ---
+    Split(['#col-1', '#col-2', '#col-3', '#col-4'], {
+        sizes: [5, 15, 50, 30], // Initial Percentages
+        minSize: [60, 150, 300, 250], // Minimum width in pixels
+        gutterSize: 4,
+        cursor: 'col-resize'
+    });
+
     // --- IMAGE FALLBACK ---
     const img = document.getElementById('crestImg');
     const attempts = ['/static/family_crest.png', '/static/family_crest.jpeg', '/static/Family_Crest.jpg'];
@@ -203,7 +211,7 @@
         }
     }
 
-    // --- LOGIC ---
+    // --- APP LOGIC ---
     const fileList = document.getElementById('file-list');
     const codeEditor = document.getElementById('code-editor');
     const qaLog = document.getElementById('qaLog');
@@ -212,7 +220,7 @@
     const termInput = document.getElementById('termInput');
     const termOutput = document.getElementById('termOutput');
 
-    // 1. FILE TREE
+    // FILE TREE
     async function loadFiles() {
         try {
             const res = await fetch('/api/files/tree');
@@ -235,7 +243,6 @@
     }
 
     async function openFile(path) {
-        // Don't hide the crest anymore. Just load text over it.
         codeEditor.value = "Loading " + path + "...";
         try {
             const res = await fetch(`/api/files/open?path=${encodeURIComponent(path)}`);
@@ -247,7 +254,7 @@
     }
     loadFiles();
 
-    // 2. CHAT
+    // CHAT
     async function sendToBrockston() {
         const text = brockstonInput.value;
         if(!text) return;
@@ -273,7 +280,7 @@
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendToBrockston(); }
     });
 
-    // 3. TERMINAL
+    // TERMINAL
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
     ws.onmessage = (event) => {
