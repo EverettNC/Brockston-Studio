@@ -96,7 +96,7 @@ async def shutdown_event():
 # Serve frontend static files
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=str(frontend_path)), name="static")
+    app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
 
 
 @app.get("/", response_class=FileResponse)
