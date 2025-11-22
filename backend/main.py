@@ -11,6 +11,12 @@ import ptyprocess
 from pathlib import Path
 from typing import Optional
 
+# --- GEMINI 3 FIX: Import dotenv to load API keys immediately ---
+from dotenv import load_dotenv
+
+# --- GEMINI 3 FIX: Load environment variables before services start ---
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect, File, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -93,9 +99,10 @@ async def shutdown_event():
     logger.info("BROCKSTON Studio shut down")
 
 
-# Serve frontend static files
+# --- GEMINI 3 FIX: Serve frontend static files correctly ---
 frontend_path = Path(__file__).parent.parent / "frontend"
 if frontend_path.exists():
+    # We point explicitly to the 'static' subdirectory now
     app.mount("/static", StaticFiles(directory=str(frontend_path / "static")), name="static")
 
 
@@ -126,15 +133,6 @@ async def health_check():
 async def open_file(path: str = Query(..., description="File path to open")):
     """
     Open and read a file from disk.
-
-    Args:
-        path: File path (absolute or relative to workspace)
-
-    Returns:
-        File path and contents
-
-    Raises:
-        HTTPException: If file not found or read error
     """
     try:
         # Resolve and validate path
@@ -177,15 +175,6 @@ async def open_file(path: str = Query(..., description="File path to open")):
 async def save_file(request: SaveFileRequest):
     """
     Save file contents to disk.
-
-    Args:
-        request: File path and content to save
-
-    Returns:
-        Success status
-
-    Raises:
-        HTTPException: If write error occurs
     """
     try:
         # Resolve and validate path
@@ -216,15 +205,6 @@ async def save_file(request: SaveFileRequest):
 async def git_clone(request: CloneRepoRequest):
     """
     Clone a Git repository into the workspace.
-
-    Args:
-        request: Repository URL and optional folder name
-
-    Returns:
-        Clone status with local path information
-
-    Raises:
-        HTTPException: If clone operation fails
     """
     try:
         # Clone the repository
@@ -264,15 +244,6 @@ async def git_clone(request: CloneRepoRequest):
 async def brockston_chat(request: ChatRequest):
     """
     Chat with AI assistant (BROCKSTON or UltimateEV) about code or ask questions.
-
-    Args:
-        request: Chat messages, optional file context, and model selection
-
-    Returns:
-        AI assistant's reply
-
-    Raises:
-        HTTPException: If AI communication fails
     """
     try:
         # Convert Pydantic models to dicts for client
@@ -306,15 +277,6 @@ async def brockston_chat(request: ChatRequest):
 async def brockston_suggest_fix(request: SuggestFixRequest):
     """
     Ask AI assistant (BROCKSTON or UltimateEV) to suggest code improvements.
-
-    Args:
-        request: Current code, instruction, optional file path, and model selection
-
-    Returns:
-        Proposed code and summary of changes
-
-    Raises:
-        HTTPException: If AI communication fails
     """
     try:
         model = request.model or "brockston"
@@ -353,15 +315,6 @@ async def brockston_suggest_fix(request: SuggestFixRequest):
 async def transcribe_audio(audio: UploadFile = File(...)):
     """
     Transcribe audio to text using speech-to-text.
-
-    Args:
-        audio: Audio file upload (webm, mp3, mp4, wav, etc.)
-
-    Returns:
-        Transcribed text
-
-    Raises:
-        HTTPException: If transcription fails
     """
     try:
         # Read audio data
@@ -388,15 +341,6 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 async def synthesize_speech(request: SynthesizeSpeechRequest):
     """
     Convert text to speech using text-to-speech.
-
-    Args:
-        request: Text to convert and voice selection
-
-    Returns:
-        Audio file (MP3 format)
-
-    Raises:
-        HTTPException: If synthesis fails
     """
     try:
         # Synthesize speech
@@ -427,20 +371,7 @@ async def synthesize_speech(request: SynthesizeSpeechRequest):
 @app.post("/api/speech/chat")
 async def speech_chat(request: SpeechChatRequest):
     """
-    Full speech-to-speech chat flow:
-    1. User's speech is already transcribed (included in messages)
-    2. Get AI response as text
-    3. Convert AI response to speech
-    4. Return both text and audio
-
-    Args:
-        request: Chat messages (with transcribed user speech), context, model, and voice
-
-    Returns:
-        Audio file (MP3 format) of AI response
-
-    Raises:
-        HTTPException: If chat or synthesis fails
+    Full speech-to-speech chat flow.
     """
     try:
         # Convert Pydantic models to dicts for client
@@ -522,7 +453,6 @@ async def general_exception_handler(request, exc):
 async def terminal_websocket(websocket: WebSocket):
     """
     WebSocket endpoint for terminal interaction.
-
     Spawns a bash shell in a PTY and bidirectionally streams I/O.
     """
     await websocket.accept()
