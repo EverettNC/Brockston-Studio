@@ -11,7 +11,7 @@ from typing import Optional
 
 # Server configuration
 HOST = os.getenv("BROCKSTON_HOST", "127.0.0.1")
-PORT = int(os.getenv("BROCKSTON_PORT", "5055"))
+PORT = int(os.getenv("BROCKSTON_PORT", "7777"))
 
 # AI Model endpoints
 BROCKSTON_BASE_URL = os.getenv("BROCKSTON_BASE_URL", "http://localhost:6006")

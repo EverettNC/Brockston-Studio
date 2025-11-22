@@ -2,292 +2,295 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Brockston Studio - Pro</title>
+<title>BROCKSTON STUDIO // PROFESSIONAL</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+  /* --- GLOBAL RESET --- */
+  * { box-sizing: border-box; }
+
   :root {
-    --theme-gold: #C0A062; 
+    --void-black: #000000;
+    --panel-black: #080808;
+    --neon-orange: #FF5F1F; 
     --theme-cyan: #00B4D8;
-    --bg-dark: #0a0a0a;
-    --panel-bg: #111111;
-    --border-color: #333;
-    --text-primary: #e0e0e0;
-    --text-secondary: #888;
+    --text-main: #e0e0e0;
+    --font-term: 'Menlo', 'Consolas', monospace;
   }
 
   body {
-    margin: 0;
-    height: 100vh;
-    background-color: var(--bg-dark);
-    color: var(--text-primary);
-    font-family: 'Menlo', 'Consolas', monospace; 
-    overflow: hidden;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    margin: 0; height: 100vh; background-color: #111; 
+    color: var(--text-main); font-family: var(--font-term);
+    overflow: hidden; display: flex; justify-content: center; align-items: center; padding: 15px;
   }
 
-  /* MAIN CONTAINER */
   .studio-container {
-    width: 99vw;
-    height: 98vh;
-    border: 1px solid var(--border-color);
-    display: grid;
-    grid-template-rows: 30px 1fr 200px; /* Header | Middle | Terminal */
-    background: var(--bg-dark);
+    width: 100%; height: 100%; background: var(--void-black);
+    border: 2px solid var(--neon-orange);
+    display: grid; grid-template-rows: 40px 1fr 150px; 
+    box-shadow: 0 0 30px rgba(255, 95, 31, 0.1);
   }
 
-  /* HEADER - Sleek and minimal */
+  /* HEADER */
   .header {
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    align-items: center;
-    padding: 0 10px;
-    background: #000;
-    font-size: 0.8rem;
-    letter-spacing: 1px;
-    color: var(--theme-gold);
-    font-weight: bold;
+    border-bottom: 1px solid var(--neon-orange); display: flex;
+    align-items: center; justify-content: space-between; padding: 0 20px;
+    background: #020202; font-weight: bold; letter-spacing: 3px;
+    color: var(--neon-orange); text-transform: uppercase;
   }
 
-  /* MIDDLE AREA - 4 COLUMNS */
+  /* --- MIDDLE AREA LAYOUT (Fixed Cutoffs) --- */
   .middle-area {
-    display: grid;
-    grid-template-columns: 50px 250px 1fr 350px; 
+    display: grid; 
+    /* Fixed widths for sides, Flex for center */
+    grid-template-columns: 60px 250px 1fr 400px; 
     overflow: hidden;
-    background: var(--panel-bg);
   }
 
-  /* COL 1: TOOLS (Professional Icons) */
+  /* COL 1: TOOLS */
   .col-tools {
-    border-right: 1px solid var(--border-color);
-    background: #050505;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 15px;
-    color: var(--text-secondary);
+    border-right: 1px solid var(--neon-orange); background: var(--panel-black);
+    display: flex; flex-direction: column; align-items: center; padding-top: 25px;
   }
-  .tool-icon {
-    font-size: 1.2rem; margin-bottom: 25px; cursor: pointer; transition: color 0.2s;
-  }
-  .tool-icon:hover { color: var(--theme-cyan); }
-
+  .tool-icon { font-size: 1.5rem; color: #555; margin-bottom: 35px; cursor: pointer; transition: 0.2s; }
+  .tool-icon:hover { color: var(--neon-orange); text-shadow: 0 0 10px var(--neon-orange); }
+  
   /* COL 2: FILES */
   .col-files {
-    border-right: 1px solid var(--border-color);
-    padding: 10px;
-    font-size: 0.85rem;
-    overflow-y: auto;
+    border-right: 1px solid var(--neon-orange); background: var(--panel-black);
+    padding: 15px; overflow-y: auto;
   }
-  .section-title { color: var(--theme-cyan); font-size: 0.75rem; margin-bottom: 10px; text-transform: uppercase; }
-  .file-item { margin-left: 10px; color: var(--text-secondary); cursor: pointer; margin-bottom: 5px; display: flex; align-items: center;}
-  .file-item:hover { color: var(--text-primary); }
-  .file-icon { margin-right: 8px; font-size: 0.9rem; }
+  .section-title {
+    color: var(--theme-cyan); font-size: 0.75rem; border-bottom: 1px solid #333;
+    padding-bottom: 8px; margin-bottom: 15px; letter-spacing: 1px; white-space: nowrap;
+  }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 8px 0; cursor: pointer; color: #999; font-size: 0.9rem; display: flex; align-items: center; }
+  li:hover { color: white; text-shadow: 0 0 5px white; }
+  li i { width: 20px; margin-right: 8px; text-align: center; }
 
-  /* COL 3: CENTER WORKSPACE */
+  /* --- COL 3: CENTER STAGE (WATERMARK LOGIC) --- */
   .col-center {
-    position: relative;
-    background: #000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    background: radial-gradient(circle at center, #1a0500 0%, #000000 90%);
+    position: relative; /* Parent for absolute positioning */
+    border-right: 1px solid var(--neon-orange);
     overflow: hidden;
-    border-right: 1px solid var(--border-color);
-  }
-  
-  .crest-bg {
-    max-width: 60%;
-    max-height: 60%;
-    opacity: 0.8; 
-    filter: grayscale(30%) contrast(120%); /* Professional look */
-    border-radius: 50%;
-    box-shadow: 0 0 30px rgba(0, 180, 216, 0.1);
   }
 
-  /* COL 4: Q&A PANEL (Fixed) */
-  .col-qa {
-    background: var(--panel-bg);
-    display: flex;
-    flex-direction: column;
+  /* The Crest (Background Layer) */
+  .family-crest {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 350px; 
+    opacity: 0.15; /* FADED WATERMARK */
+    z-index: 0; /* Sits behind everything */
+    pointer-events: none; /* Let clicks pass through */
+    filter: grayscale(20%);
+  }
+
+  /* The Code Editor (Foreground Layer) */
+  #code-editor {
+    position: relative;
+    z-index: 1; /* Sits on top */
+    width: 100%; 
     height: 100%;
+    background: transparent; /* SEE-THROUGH */
+    border: none; 
+    color: #e0e0e0;
+    padding: 20px; 
+    font-family: var(--font-term); 
+    font-size: 0.95rem;
+    resize: none; 
+    outline: none; 
+    line-height: 1.6;
+    display: block; /* Always there, waiting for input */
   }
-  .qa-header {
-    padding: 10px; border-bottom: 1px solid var(--border-color);
-    text-align: left; color: var(--theme-cyan); font-size: 0.8rem;
-  }
-  .qa-log {
-    flex-grow: 1; padding: 15px; overflow-y: auto; font-size: 0.85rem;
-  }
-  .qa-bubble {
-    margin-bottom: 15px; padding: 10px; border-left: 2px solid #444; background: rgba(255,255,255,0.03);
-  }
-  /* THE NEW INPUT AREA FOR BROCKSTON */
-  .qa-input-area {
-    border-top: 1px solid var(--border-color);
-    padding: 10px;
-    display: flex;
-    background: #050505;
-  }
-  .qa-text-input {
-    flex-grow: 1;
-    background: #111;
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    font-family: inherit;
-    padding: 8px;
-    resize: none;
-    height: 40px;
-    outline: none;
-  }
-  .qa-text-input:focus { border-color: var(--theme-cyan); }
-  .qa-send-btn {
-    margin-left: 10px;
-    background: var(--theme-cyan);
-    color: #000;
-    border: none;
-    padding: 0 15px;
-    cursor: pointer;
-    font-weight: bold;
-    font-family: inherit;
-  }
-  .qa-send-btn:hover { opacity: 0.9; }
 
+  /* COL 4: AI PANEL */
+  .col-ai { background: var(--panel-black); display: flex; flex-direction: column; }
+  .chat-log { flex: 1; overflow-y: auto; padding: 20px; font-size: 0.95rem; line-height: 1.5; }
+  
+  /* INPUT AREA */
+  .input-area {
+    border-top: 1px solid var(--neon-orange);
+    padding: 15px; background: #000;
+    display: flex; gap: 10px; align-items: flex-end;
+  }
+  textarea {
+    flex: 1; background: #111; border: 1px solid #333; color: white;
+    padding: 12px; font-family: inherit; resize: none; outline: none;
+    border-radius: 4px; height: 50px;
+  }
+  textarea:focus { border-color: var(--neon-orange); }
+  
+  button {
+    width: 90px; flex-shrink: 0; background: var(--neon-orange); color: #000;
+    border: none; height: 50px; font-weight: bold; cursor: pointer; border-radius: 2px;
+  }
+  button:hover { background: #ff7b47; }
 
   /* BOTTOM: TERMINAL */
   .terminal-panel {
-    border-top: 1px solid var(--border-color);
-    background: #000;
-    padding: 5px 10px;
-    display: flex;
-    flex-direction: column;
-    font-size: 0.9rem;
+    border-top: 2px solid var(--neon-orange); background: #000;
+    padding: 10px 20px; color: #27c93f; font-size: 0.9rem; overflow-y: auto;
   }
-  .terminal-header { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 5px; }
-  .input-line { display: flex; align-items: center; height: 100%; }
-  .prompt-sign { color: var(--theme-green); margin-right: 8px; }
   .cli-input {
-    background: transparent; border: none; color: var(--theme-gold);
-    font-family: inherit; font-size: 0.9rem; width: 100%;
-    outline: none;
+    background: transparent; border: none; color: var(--neon-orange);
+    width: 100%; font-family: inherit; font-size: 1rem; outline: none; margin-left: 10px;
   }
 </style>
-<!-- Using FontAwesome for professional icons -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
 <div class="studio-container">
-  <!-- HEADER -->
   <div class="header">
-    BROCKSTON STUDIO // PROFESSIONAL EDITION
+    <span>BROCKSTON STUDIO // PROFESSIONAL</span>
+    <span style="font-size: 0.8em; color: #555;">HOST: 127.0.0.1</span>
   </div>
 
-  <!-- MIDDLE -->
   <div class="middle-area">
-    
-    <!-- 1. TOOLS -->
     <div class="col-tools">
       <i class="fa-solid fa-terminal tool-icon" title="Terminal"></i>
-      <i class="fa-solid fa-code-branch tool-icon" title="Git Control"></i>
+      <i class="fa-solid fa-code-branch tool-icon" title="Git"></i>
       <i class="fa-solid fa-magnifying-glass tool-icon" title="Search"></i>
-      <i class="fa-solid fa-gear tool-icon" title="Settings"></i>
+      <i class="fa-solid fa-gear tool-icon" title="Settings" style="margin-top: auto;"></i>
     </div>
 
-    <!-- 2. FILES -->
     <div class="col-files">
-      <div class="section-title">Project Explorer</div>
-      <div class="file-item"><i class="fa-regular fa-folder file-icon"></i> backend/</div>
-      <div class="file-item"><i class="fa-regular fa-folder file-icon"></i> frontend/</div>
-      <div class="file-item"><i class="fa-brands fa-python file-icon"></i> app.py</div>
-      <div class="file-item"><i class="fa-regular fa-image file-icon"></i> family_crest.jpg</div>
-      <div class="section-title" style="margin-top: 20px;">Memory Core</div>
-      <div class="file-item"><i class="fa-solid fa-brain file-icon" style="color:var(--theme-gold)"></i> StillHere_Protocol</div>
+      <div class="section-title">PROJECT EXPLORER</div>
+      <ul id="file-list"><li>[Connecting...]</li></ul>
+      <div class="section-title" style="margin-top: 30px;">MEMORY CORE</div>
+      <ul><li><i class="fa-solid fa-brain" style="color: gold;"></i> StillHere_Protocol</li></ul>
     </div>
 
-    <!-- 3. CENTER -->
     <div class="col-center">
-      <img src="/static/family_crest.jpg?v=2" class="crest-bg" alt="Family Crest">
+      <img src="/static/family_crest.jpg" class="family-crest" alt="Family Crest" id="crestImg" onerror="tryNextImage()">
+      <textarea id="code-editor" spellcheck="false" placeholder="// Select a file to begin..."></textarea>
     </div>
 
-    <!-- 4. Q&A PANEL -->
-    <div class="col-qa">
-      <div class="qa-header">ASK BROCKSTON / ULTIMATE_EV</div>
-      <div class="qa-log" id="qaLog">
-        <div class="qa-bubble" style="border-color: var(--theme-cyan);">
-          <span style="color:var(--theme-cyan)">[SYSTEM]:</span> Neural Link Active. Ready for queries.
-        </div>
+    <div class="col-ai">
+      <div class="section-title" style="padding: 15px 20px 0 20px; margin-bottom: 0; border: none;">ASK BROCKSTON / ULTIMATE_EV</div>
+      <div class="chat-log" id="qaLog">
+        <div style="color: var(--theme-cyan);">[SYSTEM]: Neural Link Active.</div>
       </div>
-      
-      <!-- THE NEW INPUT AREA -->
-      <div class="qa-input-area">
-          <textarea class="qa-text-input" id="brockstonInput" placeholder="Ask a question... (Press Enter to send)"></textarea>
-          <button class="qa-send-btn" id="sendBtn">SEND</button>
+      <div class="input-area">
+        <textarea id="brockstonInput" placeholder="Enter query..."></textarea>
+        <button id="sendBtn">SEND</button>
       </div>
     </div>
-
   </div>
 
-  <!-- BOTTOM: TERMINAL -->
   <div class="terminal-panel" onclick="document.getElementById('termInput').focus()">
-    <div class="terminal-header">GITHUB LINK / SYSTEM TERMINAL</div>
-    <div class="input-line">
-      <span style="color:#27c93f; margin-right: 10px;">➜</span> 
-      <input type="text" class="cli-input" id="termInput" placeholder="Enter command..." autofocus>
+    <div style="color: #666; font-size: 0.8em; margin-bottom: 5px;">SYSTEM TERMINAL</div>
+    <div id="termOutput"></div>
+    <div style="display: flex;">
+      <span style="color: var(--neon-orange);">➜</span>
+      <input type="text" class="cli-input" id="termInput" autofocus>
     </div>
   </div>
 </div>
 
 <script>
-  const termInput = document.getElementById('termInput');
-  const brockstonInput = document.getElementById('brockstonInput');
-  const sendBtn = document.getElementById('sendBtn');
-  const qaLog = document.getElementById('qaLog');
-
-  // --- Terminal Handling ---
-  termInput.addEventListener('keypress', async (e) => {
-    if (e.key === 'Enter' && termInput.value) {
-      const text = termInput.value;
-      termInput.value = '';
-      // Here we would send to the backend terminal endpoint
-      console.log(`Terminal command: ${text}`);
+    // --- IMAGE FALLBACK ---
+    const img = document.getElementById('crestImg');
+    const attempts = ['/static/family_crest.png', '/static/family_crest.jpeg', '/static/Family_Crest.jpg'];
+    let attemptIdx = 0;
+    function tryNextImage() {
+        if (attemptIdx < attempts.length) {
+            img.src = attempts[attemptIdx];
+            attemptIdx++;
+        }
     }
-  });
 
-  // --- Brockston Q&A Handling ---
-  function sendToBrockston() {
-      const text = brockstonInput.value;
-      if(!text) return;
-      brockstonInput.value = '';
+    // --- LOGIC ---
+    const fileList = document.getElementById('file-list');
+    const codeEditor = document.getElementById('code-editor');
+    const qaLog = document.getElementById('qaLog');
+    const brockstonInput = document.getElementById('brockstonInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const termInput = document.getElementById('termInput');
+    const termOutput = document.getElementById('termOutput');
 
-      // 1. Show User Question
-      qaLog.innerHTML += `
-        <div class="qa-bubble" style="border-color:#555;">
-          <span style="color:#aaa">YOU:</span> ${text}
-        </div>
-      `;
-      qaLog.scrollTop = qaLog.scrollHeight;
+    // 1. FILE TREE
+    async function loadFiles() {
+        try {
+            const res = await fetch('/api/files/tree');
+            const data = await res.json();
+            fileList.innerHTML = ''; 
+            if(data.files) {
+                data.files.forEach(file => {
+                    const li = document.createElement('li');
+                    let icon = 'fa-file';
+                    if(file.is_dir) icon = 'fa-folder';
+                    else if(file.name.endsWith('.py')) icon = 'fa-brands fa-python';
+                    li.innerHTML = `<i class="fa-regular ${icon}"></i> ${file.name}`;
+                    li.onclick = () => openFile(file.path);
+                    fileList.appendChild(li);
+                });
+            }
+        } catch (e) {
+            fileList.innerHTML = '<li style="color:red">Backend Offline</li>';
+        }
+    }
 
-      // 2. Simulate Response (Replace with actual fetch call later)
-      setTimeout(() => {
-           qaLog.innerHTML += `
-             <div class="qa-bubble" style="border-color:var(--theme-cyan);">
-               <span style="color:var(--theme-cyan)">[BROCKSTON]:</span> Analyzing request... <br>
-               Acknowledgement received.
-             </div>
-           `;
-           qaLog.scrollTop = qaLog.scrollHeight;
-      }, 600);
-  }
+    async function openFile(path) {
+        // Don't hide the crest anymore. Just load text over it.
+        codeEditor.value = "Loading " + path + "...";
+        try {
+            const res = await fetch(`/api/files/open?path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            codeEditor.value = data.content; 
+        } catch (e) {
+            codeEditor.value = "[ERROR] Could not read file.";
+        }
+    }
+    loadFiles();
 
-  brockstonInput.addEventListener('keypress', (e) => {
-      if(e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault(); // Prevents new line
-          sendToBrockston();
-      }
-  });
+    // 2. CHAT
+    async function sendToBrockston() {
+        const text = brockstonInput.value;
+        if(!text) return;
+        brockstonInput.value = '';
+        qaLog.innerHTML += `<div style="margin-top:15px; color:#888;">YOU: ${text}</div>`;
+        qaLog.scrollTop = qaLog.scrollHeight;
 
-  sendBtn.addEventListener('click', sendToBrockston);
+        try {
+            const response = await fetch('/api/brockston/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messages: [{ role: "user", content: text }], model: "brockston" })
+            });
+            const data = await response.json();
+            qaLog.innerHTML += `<div style="color: var(--theme-cyan); margin-top:5px;">[BROCKSTON]: ${data.reply}</div>`;
+        } catch (e) {
+            qaLog.innerHTML += `<div style="color: red; margin-top:5px;">[ERROR]: Link Failed</div>`;
+        }
+        qaLog.scrollTop = qaLog.scrollHeight;
+    }
+    sendBtn.addEventListener('click', sendToBrockston);
+    brockstonInput.addEventListener('keypress', (e) => {
+        if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendToBrockston(); }
+    });
 
+    // 3. TERMINAL
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'output') {
+            const cleanData = msg.data.replace(/\n/g, '<br>');
+            termOutput.innerHTML += `<span>${cleanData}</span>`;
+            document.querySelector('.terminal-panel').scrollTop = document.querySelector('.terminal-panel').scrollHeight;
+        }
+    };
+    termInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const cmd = termInput.value;
+            termInput.value = '';
+            ws.send(JSON.stringify({ type: 'input', data: cmd + '\n' }));
+        }
+    });
 </script>
 </body>
 </html>

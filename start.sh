@@ -22,7 +22,7 @@ fi
 
 # Set default environment variables if not already set
 export BROCKSTON_HOST="${BROCKSTON_HOST:-127.0.0.1}"
-export BROCKSTON_PORT="${BROCKSTON_PORT:-5055}"
+export BROCKSTON_PORT="${BROCKSTON_PORT:-7777}"
 export BROCKSTON_BASE_URL="${BROCKSTON_BASE_URL:-http://localhost:6006}"
 
 echo "Configuration:"
