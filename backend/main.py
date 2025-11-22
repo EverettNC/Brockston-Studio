@@ -491,4 +491,101 @@ async def general_exception_handler(request, exc):
 async def terminal_websocket(websocket: WebSocket):
     """
     WebSocket endpoint for terminal interaction.
-    Spawns a bash shell in
+    Spawns a bash shell in a PTY and bidirectionally streams I/O.
+    """
+    await websocket.accept()
+    logger.info("Terminal WebSocket connection accepted")
+
+    # Determine shell to use
+    shell = os.environ.get("SHELL", "/bin/bash")
+
+    # Get workspace root for shell working directory
+    workspace_root = get_workspace_root()
+
+    try:
+        # Spawn shell process in PTY
+        process = ptyprocess.PtyProcess.spawn(
+            [shell],
+            cwd=str(workspace_root),
+            env=os.environ.copy(),
+        )
+
+        logger.info(f"Spawned shell: {shell} (PID: {process.pid})")
+
+        # Task to read from PTY and send to WebSocket
+        async def read_from_pty():
+            try:
+                while process.isalive():
+                    try:
+                        # Read from PTY (non-blocking with timeout)
+                        output = process.read(1024)
+                        if output:
+                            await websocket.send_json({
+                                "type": "output",
+                                "data": output.decode("utf-8", errors="replace"),
+                            })
+                    except EOFError:
+                        break
+                    except Exception as e:
+                        logger.error(f"Error reading from PTY: {e}")
+                        break
+                    await asyncio.sleep(0.01)  # Small delay to prevent busy loop
+            except Exception as e:
+                logger.error(f"PTY read task error: {e}")
+
+        # Task to read from WebSocket and write to PTY
+        async def read_from_websocket():
+            try:
+                while True:
+                    message = await websocket.receive_json()
+                    if message.get("type") == "input":
+                        data = message.get("data", "")
+                        process.write(data.encode("utf-8"))
+            except WebSocketDisconnect:
+                logger.info("WebSocket disconnected")
+            except Exception as e:
+                logger.error(f"WebSocket read error: {e}")
+
+        # Run both tasks concurrently
+        await asyncio.gather(
+            read_from_pty(),
+            read_from_websocket(),
+        )
+
+    except Exception as e:
+        logger.error(f"Terminal WebSocket error: {e}")
+        await websocket.send_json({
+            "type": "error",
+            "data": f"Terminal error: {str(e)}",
+        })
+    finally:
+        # Clean up: kill process and close WebSocket
+        try:
+            if process.isalive():
+                process.terminate(force=True)
+                logger.info(f"Terminated shell process (PID: {process.pid})")
+        except:
+            pass
+
+        try:
+            await websocket.close()
+        except:
+            pass
+
+        logger.info("Terminal WebSocket connection closed")
+
+
+# ============================================================================
+# Development Server
+# ============================================================================
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "backend.main:app",
+        host=HOST,
+        port=PORT,
+        reload=True,
+        log_level="info",
+    )
