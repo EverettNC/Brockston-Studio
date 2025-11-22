@@ -171,17 +171,21 @@
     outline: none;
   }
 </style>
+<!-- Using FontAwesome for professional icons -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
 <div class="studio-container">
+  <!-- HEADER -->
   <div class="header">
     BROCKSTON STUDIO // PROFESSIONAL EDITION
   </div>
 
+  <!-- MIDDLE -->
   <div class="middle-area">
     
+    <!-- 1. TOOLS -->
     <div class="col-tools">
       <i class="fa-solid fa-terminal tool-icon" title="Terminal"></i>
       <i class="fa-solid fa-code-branch tool-icon" title="Git Control"></i>
@@ -189,6 +193,7 @@
       <i class="fa-solid fa-gear tool-icon" title="Settings"></i>
     </div>
 
+    <!-- 2. FILES -->
     <div class="col-files">
       <div class="section-title">Project Explorer</div>
       <div class="file-item"><i class="fa-regular fa-folder file-icon"></i> backend/</div>
@@ -199,10 +204,12 @@
       <div class="file-item"><i class="fa-solid fa-brain file-icon" style="color:var(--theme-gold)"></i> StillHere_Protocol</div>
     </div>
 
+    <!-- 3. CENTER -->
     <div class="col-center">
       <img src="static/family_crest.jpg" class="crest-bg" alt="Family Crest">
     </div>
 
+    <!-- 4. Q&A PANEL -->
     <div class="col-qa">
       <div class="qa-header">ASK BROCKSTON / ULTIMATE_EV</div>
       <div class="qa-log" id="qaLog">
@@ -211,6 +218,7 @@
         </div>
       </div>
       
+      <!-- THE NEW INPUT AREA -->
       <div class="qa-input-area">
           <textarea class="qa-text-input" id="brockstonInput" placeholder="Ask a question... (Press Enter to send)"></textarea>
           <button class="qa-send-btn" id="sendBtn">SEND</button>
@@ -219,6 +227,7 @@
 
   </div>
 
+  <!-- BOTTOM: TERMINAL -->
   <div class="terminal-panel" onclick="document.getElementById('termInput').focus()">
     <div class="terminal-header">GITHUB LINK / SYSTEM TERMINAL</div>
     <div class="input-line">
