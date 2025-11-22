@@ -299,3 +299,35 @@
 </script>
 </body>
 </html>
+// 3. TERMINAL (Cleaned Up)
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
+    
+    ws.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'output') {
+            let raw = msg.data;
+            
+            // FILTER 1: Remove standard ANSI colors (Red, Green, Bold)
+            // Looks for Esc[...m
+            let clean = raw.replace(/\x1B\[[0-9;]*m/g, '');
+
+            // FILTER 2: Remove ZSH Shell Junk (The ?2004h stuff you see)
+            // Looks for Esc[?2004h and Esc[?2004l
+            clean = clean.replace(/\x1B\[\?[0-9;]*[a-zA-Z]/g, '');
+
+            // FILTER 3: Remove weird percentage signs if ZSH adds them at line ends
+            clean = clean.replace(/%\s*$/, '');
+
+            // Convert newlines to HTML breaks
+            clean = clean.replace(/\n/g, '<br>');
+            
+            // Only append if there's actual text left
+            if (clean.trim().length > 0 || clean.includes('<br>')) {
+                termOutput.innerHTML += `<span>${clean}</span>`;
+                // Auto-scroll to bottom
+                const panel = document.querySelector('.terminal-panel');
+                panel.scrollTop = panel.scrollHeight;
+            }
+        }
+    };
