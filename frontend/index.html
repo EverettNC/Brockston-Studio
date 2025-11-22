@@ -40,7 +40,7 @@
     align-items: center; justify-content: space-between; padding: 0 20px;
     background: #020202; font-weight: bold; letter-spacing: 3px;
     color: var(--neon-orange); text-transform: uppercase;
-    flex-shrink: 0; /* Fixed height */
+    flex-shrink: 0;
   }
 
   /* --- MIDDLE AREA (SLIDING) --- */
@@ -60,7 +60,7 @@
     border-right: 1px solid #333;
   }
   .gutter:hover {
-    background-color: var(--neon-orange); /* Lights up Orange on hover */
+    background-color: var(--neon-orange);
     border-color: var(--neon-orange);
   }
 
@@ -281,12 +281,26 @@
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
-            // REGEX: STRIPS THE UGLY ANSI CODES ([27m, [1m, etc.)
-            let cleanData = msg.data.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
-            cleanData = cleanData.replace(/\n/g, '<br>');
+            let raw = msg.data;
             
-            termOutput.innerHTML += `<span>${cleanData}</span>`;
-            document.querySelector('.terminal-panel').scrollTop = document.querySelector('.terminal-panel').scrollHeight;
+            // FILTER 1: Remove standard ANSI colors (Red, Green, Bold)
+            let clean = raw.replace(/\x1B\[[0-9;]*m/g, '');
+
+            // FILTER 2: Remove ZSH Shell Junk (The ?2004h stuff)
+            clean = clean.replace(/\x1B\[\?[0-9;]*[a-zA-Z]/g, '');
+
+            // FILTER 3: Remove weird percentage signs at end of line
+            clean = clean.replace(/%\s*$/, '');
+
+            // Convert newlines
+            clean = clean.replace(/\n/g, '<br>');
+            
+            // Only append if there's real text
+            if (clean.trim().length > 0 || clean.includes('<br>')) {
+                termOutput.innerHTML += `<span>${clean}</span>`;
+                const panel = document.querySelector('.terminal-panel');
+                panel.scrollTop = panel.scrollHeight;
+            }
         }
     };
     termInput.addEventListener('keypress', (e) => {
@@ -299,35 +313,3 @@
 </script>
 </body>
 </html>
-// 3. TERMINAL (Cleaned Up)
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
-    
-    ws.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        if (msg.type === 'output') {
-            let raw = msg.data;
-            
-            // FILTER 1: Remove standard ANSI colors (Red, Green, Bold)
-            // Looks for Esc[...m
-            let clean = raw.replace(/\x1B\[[0-9;]*m/g, '');
-
-            // FILTER 2: Remove ZSH Shell Junk (The ?2004h stuff you see)
-            // Looks for Esc[?2004h and Esc[?2004l
-            clean = clean.replace(/\x1B\[\?[0-9;]*[a-zA-Z]/g, '');
-
-            // FILTER 3: Remove weird percentage signs if ZSH adds them at line ends
-            clean = clean.replace(/%\s*$/, '');
-
-            // Convert newlines to HTML breaks
-            clean = clean.replace(/\n/g, '<br>');
-            
-            // Only append if there's actual text left
-            if (clean.trim().length > 0 || clean.includes('<br>')) {
-                termOutput.innerHTML += `<span>${clean}</span>`;
-                // Auto-scroll to bottom
-                const panel = document.querySelector('.terminal-panel');
-                panel.scrollTop = panel.scrollHeight;
-            }
-        }
-    };
