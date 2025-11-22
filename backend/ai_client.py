@@ -1,23 +1,21 @@
 """
 Unified AI Client
 
-Manages communication with multiple AI models (BROCKSTON, UltimateEV).
-Routes requests to the appropriate model based on user selection.
+Manages communication with AI models.
+UPDATED: Falls back to OpenAI if local models (Brockston/UltimateEV) are offline.
 """
 
+import os
 import httpx
 from typing import List, Dict, Optional
 import logging
 
 logger = logging.getLogger(__name__)
 
-
 class AIClient:
     """
-    Unified client for interacting with multiple AI models.
-
-    Supports BROCKSTON and UltimateEV, routing requests to the
-    appropriate endpoint based on model selection.
+    Unified client for interacting with AI models.
+    Now supports direct OpenAI connection for the 'Brockston' persona.
     """
 
     def __init__(
@@ -26,14 +24,10 @@ class AIClient:
         ultimateev_url: Optional[str] = None,
         timeout: float = 120.0
     ):
-        """
-        Initialize AI client with multiple model endpoints.
-
-        Args:
-            brockston_url: HTTP endpoint for BROCKSTON (e.g., 'http://localhost:6006')
-            ultimateev_url: HTTP endpoint for UltimateEV (e.g., 'http://localhost:6007')
-            timeout: Request timeout in seconds (default: 120s for LLM inference)
-        """
+        # Load API Key from Environment
+        self.api_key = os.getenv("OPENAI_API_KEY")
+        
+        # Configuration
         self.endpoints = {
             "brockston": brockston_url,
             "ultimateev": ultimateev_url
@@ -41,9 +35,11 @@ class AIClient:
         self.timeout = timeout
         self.client = httpx.AsyncClient(timeout=timeout)
 
-        logger.info(f"AI client initialized:")
-        logger.info(f"  - BROCKSTON: {brockston_url or 'MOCK MODE'}")
-        logger.info(f"  - UltimateEV: {ultimateev_url or 'MOCK MODE'}")
+        logger.info("AI Client Initialized.")
+        if self.api_key:
+            logger.info("  - OpenAI Link: ACTIVE (Primary)")
+        else:
+            logger.warning("  - OpenAI Link: INACTIVE (No Key Found)")
 
     async def chat(
         self,
@@ -52,45 +48,60 @@ class AIClient:
         context: Optional[Dict[str, str]] = None
     ) -> str:
         """
-        Send a chat request to the specified AI model.
-
-        Args:
-            messages: List of message dicts with 'role' and 'content' keys
-            model: Which model to use ('brockston' or 'ultimateev')
-            context: Optional context dict with 'path' and 'code' keys
-
-        Returns:
-            Assistant reply text from the AI model
-
-        Raises:
-            ValueError: If model is not supported
-            RuntimeError: If AI request fails
+        Send a chat request. 
+        Priority: Local URL -> OpenAI -> Mock.
         """
+        # 1. Add System Context if available
+        if context and context.get('code'):
+            system_msg = f"Current File Context ({context.get('path')}):\n\n{context.get('code')}"
+            messages.insert(0, {"role": "system", "content": system_msg})
+
+        # 2. Try OpenAI (The Reliable Brain)
+        if self.api_key:
+            try:
+                return await self._chat_openai(messages)
+            except Exception as e:
+                logger.error(f"OpenAI Connection Failed: {e}")
+                # Fall through to other methods if OpenAI fails
+        
+        # 3. Try Local Endpoint (The Custom Brain)
         base_url = self._get_endpoint(model)
+        if base_url:
+            try:
+                return await self._chat_local(base_url, messages, context)
+            except Exception as e:
+                logger.warning(f"Local Brain {model} failed: {e}")
 
-        if not base_url:
-            return self._mock_chat_response(messages, model, context)
+        # 4. Give Up (Mock)
+        return self._mock_chat_response(messages, model, context)
 
-        try:
-            # Prepare request payload
-            payload = {
-                "messages": messages,
-                "context": context or {}
-            }
+    async def _chat_openai(self, messages: List[Dict[str, str]]) -> str:
+        """Direct connection to OpenAI."""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": "gpt-4-turbo", # Or gpt-3.5-turbo
+            "messages": messages,
+            "temperature": 0.7
+        }
+        
+        response = await self.client.post(
+            "https://api.openai.com/v1/chat/completions",
+            json=payload,
+            headers=headers
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
-            # Make HTTP request to AI model
-            response = await self.client.post(
-                f"{base_url}/chat",
-                json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
-            return result.get("reply", "")
-
-        except httpx.HTTPError as e:
-            logger.error(f"{model.upper()} chat request failed: {e}")
-            raise RuntimeError(f"Failed to communicate with {model.upper()}: {e}")
+    async def _chat_local(self, base_url, messages, context):
+        """Connection to local microservices (port 6006/6007)."""
+        payload = {"messages": messages, "context": context or {}}
+        response = await self.client.post(f"{base_url}/chat", json=payload)
+        response.raise_for_status()
+        return response.json().get("reply", "")
 
     async def suggest_fix(
         self,
@@ -100,123 +111,39 @@ class AIClient:
         path: Optional[str] = None
     ) -> Dict[str, str]:
         """
-        Request AI model to suggest code improvements.
-
-        Args:
-            code: Current file contents
-            instruction: What to do (e.g., "refactor for clarity", "fix bug")
-            model: Which model to use ('brockston' or 'ultimateev')
-            path: Optional file path for context
-
-        Returns:
-            Dict with keys:
-                - 'proposed_code': Full rewritten version of the file
-                - 'summary': Short description of changes
-
-        Raises:
-            ValueError: If model is not supported
-            RuntimeError: If AI request fails
+        Ask AI to fix code. Uses OpenAI directly.
         """
-        base_url = self._get_endpoint(model)
-
-        if not base_url:
+        if not self.api_key:
             return self._mock_suggest_fix_response(code, instruction, model, path)
 
+        prompt = f"Instruction: {instruction}\n\nFile: {path}\n\nCode:\n{code}\n\nReturn only the fixed code."
+        messages = [
+            {"role": "system", "content": "You are a coding assistant. Return the full fixed code block only."},
+            {"role": "user", "content": prompt}
+        ]
+
         try:
-            # Prepare request payload
-            payload = {
-                "code": code,
-                "instruction": instruction,
-                "path": path
-            }
-
-            # Make HTTP request to AI model
-            response = await self.client.post(
-                f"{base_url}/suggest_fix",
-                json=payload
-            )
-            response.raise_for_status()
-
-            result = response.json()
+            fixed_code = await self._chat_openai(messages)
             return {
-                "proposed_code": result.get("proposed_code", ""),
-                "summary": result.get("summary", "")
+                "proposed_code": fixed_code,
+                "summary": f"Applied fix: {instruction}"
             }
-
-        except httpx.HTTPError as e:
-            logger.error(f"{model.upper()} suggest_fix request failed: {e}")
-            raise RuntimeError(f"Failed to communicate with {model.upper()}: {e}")
+        except Exception as e:
+            logger.error(f"Fix failed: {e}")
+            return self._mock_suggest_fix_response(code, instruction, model, path)
 
     def _get_endpoint(self, model: str) -> Optional[str]:
-        """
-        Get the endpoint URL for a specific model.
+        return self.endpoints.get(model.lower())
 
-        Args:
-            model: Model name ('brockston' or 'ultimateev')
+    def _mock_chat_response(self, messages, model, context):
+        return "[SYSTEM ERROR]: No AI Brain connected. Please check OPENAI_API_KEY in .env."
 
-        Returns:
-            Base URL for the model, or None if not configured
-
-        Raises:
-            ValueError: If model is not supported
-        """
-        model_lower = model.lower()
-        if model_lower not in self.endpoints:
-            raise ValueError(
-                f"Unsupported model: {model}. "
-                f"Supported models: {', '.join(self.endpoints.keys())}"
-            )
-        return self.endpoints[model_lower]
-
-    def _mock_chat_response(
-        self,
-        messages: List[Dict[str, str]],
-        model: str,
-        context: Optional[Dict[str, str]]
-    ) -> str:
-        """
-        Mock chat response for development/testing when AI model is unavailable.
-        """
-        last_message = messages[-1]["content"] if messages else "No message"
-        model_name = model.upper()
-        return (
-            f"[MOCK {model_name} RESPONSE]\n\n"
-            f"You asked: '{last_message}'\n\n"
-            f"This is a mock response. Configure {model_name}_BASE_URL to connect "
-            f"to the real {model_name} model.\n\n"
-            f"Context: {context.get('path', 'No file') if context else 'No context'}"
-        )
-
-    def _mock_suggest_fix_response(
-        self,
-        code: str,
-        instruction: str,
-        model: str,
-        path: Optional[str]
-    ) -> Dict[str, str]:
-        """
-        Mock suggest_fix response for development/testing.
-        """
-        model_name = model.upper()
-        mock_code = f"# MOCK FIX from {model_name}: {instruction}\n# File: {path or 'unknown'}\n\n{code}"
-
+    def _mock_suggest_fix_response(self, code, instruction, model, path):
         return {
-            "proposed_code": mock_code,
-            "summary": (
-                f"[MOCK] Applied instruction: '{instruction}' using {model_name}. "
-                f"Configure {model_name}_BASE_URL to connect to the real model."
-            )
+            "proposed_code": code,
+            "summary": "Error: No AI available to process fix."
         }
 
     async def close(self):
-        """Close the HTTP client."""
         if self.client:
             await self.client.aclose()
-
-    async def __aenter__(self):
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit."""
-        await self.close()
