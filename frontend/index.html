@@ -33,34 +33,35 @@
     box-shadow: 0 0 30px rgba(255, 95, 31, 0.1);
   }
 
-  /* HEADER (Fixed Height) */
+  /* HEADER */
   .header {
     height: 40px;
     border-bottom: 1px solid var(--neon-orange); display: flex;
     align-items: center; justify-content: space-between; padding: 0 20px;
     background: #020202; font-weight: bold; letter-spacing: 3px;
     color: var(--neon-orange); text-transform: uppercase;
-    flex-shrink: 0;
+    flex-shrink: 0; /* Fixed height */
   }
 
-  /* --- MIDDLE AREA (FLEXBOX FOR SLIDING) --- */
+  /* --- MIDDLE AREA (SLIDING) --- */
   .middle-area {
-    display: flex; /* Flex allows Split.js to resize widths */
-    flex: 1; /* Takes all remaining height */
+    display: flex; 
+    flex: 1; 
     overflow: hidden;
-    height: calc(100% - 190px); /* Subtract header + terminal height */
+    height: calc(100% - 190px); 
   }
 
-  /* DRAG HANDLES (GUTTERS) */
+  /* THE SLIDER LINES (GUTTERS) */
   .gutter {
-    background-color: #222;
-    background-repeat: no-repeat;
-    background-position: 50%;
+    background-color: #111;
     cursor: col-resize;
     transition: background-color 0.2s;
+    border-left: 1px solid #333;
+    border-right: 1px solid #333;
   }
   .gutter:hover {
-    background-color: var(--neon-orange); /* Lights up when you grab it */
+    background-color: var(--neon-orange); /* Lights up Orange on hover */
+    border-color: var(--neon-orange);
   }
 
   /* COL 1: TOOLS */
@@ -86,20 +87,16 @@
   li:hover { color: white; text-shadow: 0 0 5px white; }
   li i { width: 20px; margin-right: 8px; text-align: center; }
 
-  /* --- COL 3: CENTER STAGE --- */
+  /* COL 3: CENTER STAGE */
   .col-center {
     background: radial-gradient(circle at center, #1a0500 0%, #000000 90%);
     position: relative; 
     overflow: hidden;
   }
-
-  /* Watermark */
   .family-crest {
     position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: 350px; opacity: 0.15; z-index: 0; pointer-events: none; filter: grayscale(20%);
   }
-
-  /* Code Editor */
   #code-editor {
     position: relative; z-index: 1; width: 100%; height: 100%;
     background: transparent; border: none; color: #e0e0e0;
@@ -128,7 +125,7 @@
   }
   button:hover { background: #ff7b47; }
 
-  /* BOTTOM: TERMINAL (Fixed Height) */
+  /* BOTTOM: TERMINAL */
   .terminal-panel {
     height: 150px;
     border-top: 2px solid var(--neon-orange); background: #000;
@@ -165,7 +162,7 @@
     </div>
 
     <div class="col-center" id="col-3">
-      <img src="/static/family_crest.jpg" class="family-crest" alt="Family Crest" id="crestImg" onerror="tryNextImage()">
+      <img src="/static/family_crest.png" class="family-crest" alt="Family Crest" id="crestImg" onerror="tryNextImage()">
       <textarea id="code-editor" spellcheck="false" placeholder="// Select a file to begin..."></textarea>
     </div>
 
@@ -192,17 +189,17 @@
 </div>
 
 <script>
-    // --- 1. INITIALIZE SLIDING COLUMNS ---
+    // --- 1. SLIDER LOGIC ---
     Split(['#col-1', '#col-2', '#col-3', '#col-4'], {
-        sizes: [5, 15, 50, 30], // Initial Percentages
-        minSize: [60, 150, 300, 250], // Minimum width in pixels
-        gutterSize: 4,
+        sizes: [5, 15, 50, 30], // Percentages
+        minSize: [60, 150, 300, 250], // Pixels
+        gutterSize: 2,
         cursor: 'col-resize'
     });
 
     // --- IMAGE FALLBACK ---
     const img = document.getElementById('crestImg');
-    const attempts = ['/static/family_crest.png', '/static/family_crest.jpeg', '/static/Family_Crest.jpg'];
+    const attempts = ['/static/family_crest.jpg', '/static/family_crest.jpeg', '/static/Family_Crest.jpg'];
     let attemptIdx = 0;
     function tryNextImage() {
         if (attemptIdx < attempts.length) {
@@ -220,7 +217,6 @@
     const termInput = document.getElementById('termInput');
     const termOutput = document.getElementById('termOutput');
 
-    // FILE TREE
     async function loadFiles() {
         try {
             const res = await fetch('/api/files/tree');
@@ -254,14 +250,12 @@
     }
     loadFiles();
 
-    // CHAT
     async function sendToBrockston() {
         const text = brockstonInput.value;
         if(!text) return;
         brockstonInput.value = '';
         qaLog.innerHTML += `<div style="margin-top:15px; color:#888;">YOU: ${text}</div>`;
         qaLog.scrollTop = qaLog.scrollHeight;
-
         try {
             const response = await fetch('/api/brockston/chat', {
                 method: 'POST',
@@ -280,13 +274,17 @@
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendToBrockston(); }
     });
 
-    // TERMINAL
+    // --- TERMINAL CLEANER (THE FIX) ---
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/terminal`);
+    
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
         if (msg.type === 'output') {
-            const cleanData = msg.data.replace(/\n/g, '<br>');
+            // REGEX: STRIPS THE UGLY ANSI CODES ([27m, [1m, etc.)
+            let cleanData = msg.data.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+            cleanData = cleanData.replace(/\n/g, '<br>');
+            
             termOutput.innerHTML += `<span>${cleanData}</span>`;
             document.querySelector('.terminal-panel').scrollTop = document.querySelector('.terminal-panel').scrollHeight;
         }
