@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BROCKSTON STUDIO // PROFESSIONAL</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/split.js/1.6.0/split.min.js"></script>
+    <!-- Xterm.js for the real terminal feel -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+
+    <style>
+        /* --- GLOBAL RESET --- */
+        * { box-sizing: border-box; }
+
+        :root {
+            --void-black: #000000;
+            --panel-black: #050505;
+            --neon-orange: #FF5F1F;
+            --border-dim: #333;
+            --text-main: #e0e0e0;
+            --font-term: 'Menlo', 'Consolas', monospace;
+        }
+
+        body {
+            margin: 0; height: 100vh; background-color: var(--void-black);
+            color: var(--text-main); font-family: var(--font-term);
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* --- LAYOUT --- */
+        #app-container {
+            display: flex; flex: 1; height: 100%; width: 100%;
+        }
+
+        .split { overflow-y: auto; overflow-x: hidden; position: relative; }
+        .gutter {
+            background-color: var(--border-dim);
+            background-repeat: no-repeat; background-position: 50%;
+            cursor: col-resize;
+        }
+
+        /* --- SIDEBAR (Tools) --- */
+        #sidebar {
+            background-color: #0a0a0a; display: flex; flex-direction: column;
+            align-items: center; padding-top: 10px; border-right: 1px solid var(--border-dim);
+        }
+        .icon-btn {
+            color: #666; font-size: 1.2rem; margin-bottom: 20px; cursor: pointer; transition: color 0.2s;
+        }
+        .icon-btn:hover { color: var(--neon-orange); }
+        .icon-btn.active { color: var(--neon-orange); border-left: 2px solid var(--neon-orange); }
+
+        /* --- FILE EXPLORER --- */
+        #explorer { background-color: #080808; padding: 10px; }
+        .explorer-header {
+            color: var(--neon-orange); font-size: 0.8rem; letter-spacing: 1px;
+            margin-bottom: 15px; text-transform: uppercase; border-bottom: 1px solid var(--border-dim);
+            padding-bottom: 5px;
+        }
+        .file-item {
+            padding: 5px 0; cursor: pointer; font-size: 0.9rem; color: #888; display: flex; align-items: center;
+        }
+        .file-item:hover { color: #fff; background: #111; }
+        .file-item i { margin-right: 8px; width: 15px; text-align: center; }
+        
+        /* --- EDITOR / WORKSPACE --- */
+        #workspace {
+            background-color: var(--void-black); position: relative; display: flex; flex-direction: column;
+        }
+        
+        /* The Watermark / Crest */
+        #watermark {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            opacity: 0.1; pointer-events: none; z-index: 0;
+            /* Assuming local image exists, else fallback text */
+            background-image: url('/static/family_crest.png'); 
+            background-size: contain; background-repeat: no-repeat;
+            width: 300px; height: 300px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        #watermark::after {
+            content: "THE CHRISTMAN AI PROJECT";
+            color: var(--neon-orange); font-size: 1.5rem; text-align: center;
+            display: block;
+        }
+
+        #editor-content {
+            position: relative; z-index: 1; width: 100%; height: 100%;
+            background: transparent; color: #ddd; border: none; resize: none;
+            font-family: var(--font-term); font-size: 14px; padding: 20px;
+            outline: none; line-height: 1.5;
+        }
+
+        /* --- TERMINAL PANEL (Bottom of Workspace usually, or separate) --- */
+        /* We will use a bottom drawer logic or just put it in the 3rd col? 
+           Layout says 4-col sliding grid. Let's assume Workspace is col 3, AI is col 4.
+           Terminal usually sits at bottom. We'll put it at bottom of Workspace for now. */
+        #terminal-container {
+            height: 30%; border-top: 1px solid var(--neon-orange);
+            background: #050505; padding: 5px;
+        }
+
+        /* --- AI PANEL --- */
+        #ai-panel {
+            background-color: #080808; display: flex; flex-direction: column;
+            border-left: 1px solid var(--border-dim);
+        }
+        #chat-history {
+            flex: 1; padding: 15px; overflow-y: auto; font-size: 0.9rem;
+        }
+        .msg { margin-bottom: 15px; line-height: 1.4; }
+        .msg.user { color: #fff; }
+        .msg.ai { color: var(--neon-orange); }
+        .msg.error { color: red; }
+        
+        .system-tag { color: var(--theme-cyan, #00B4D8); font-size: 0.7rem; margin-bottom: 5px; display: block;}
+
+        #chat-input-area {
+            padding: 15px; border-top: 1px solid var(--border-dim); display: flex;
+        }
+        #chat-input {
+            flex: 1; background: #111; border: 1px solid #333; color: white;
+            padding: 10px; font-family: var(--font-term); outline: none;
+        }
+        #chat-input:focus { border-color: var(--neon-orange); }
+        #send-btn {
+            background: var(--neon-orange); color: black; border: none;
+            padding: 0 15px; font-weight: bold; cursor: pointer; margin-left: 5px;
+        }
+        #send-btn:hover { background: #ff7f4d; }
+
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div style="padding: 10px 20px; border-bottom: 1px solid var(--neon-orange); display: flex; justify-content: space-between; align-items: center;">
+        <span style="color: var(--neon-orange); font-weight: bold; letter-spacing: 2px;">BROCKSTON STUDIO // PROFESSIONAL</span>
+        <span style="font-size: 0.8rem; color: #555;">HOST: 127.0.0.1 : 7777</span>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div id="app-container">
+        <!-- COL 1: ICONS -->
+        <div id="sidebar" style="width: 50px;">
+            <div class="icon-btn active"><i class="fas fa-code"></i></div>
+            <div class="icon-btn"><i class="fas fa-terminal"></i></div>
+            <div class="icon-btn"><i class="fas fa-cog"></i></div>
+        </div>
+
+        <!-- COL 2: FILES -->
+        <div id="explorer" class="split">
+            <div class="explorer-header">PROJECT EXPLORER</div>
+            <div id="file-list">
+                <!-- JS will inject files here -->
+                <div style="color: #444; font-style: italic;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- COL 3: WORKSPACE + TERMINAL -->
+        <div id="workspace" class="split" style="display: flex; flex-direction: column;">
+            <div style="flex: 1; position: relative;">
+                <div id="watermark"></div>
+                <textarea id="editor-content" spellcheck="false" placeholder="// Select a file to begin..."></textarea>
+            </div>
+            <div id="terminal-container">
+                <!-- Xterm mounts here -->
+                <div id="terminal"></div>
+            </div>
+        </div>
+
+        <!-- COL 4: AI -->
+        <div id="ai-panel" class="split">
+            <div class="explorer-header" style="padding: 15px;">ASK BROCKSTON / ULTIMATE_FV</div>
+            <div id="chat-history">
+                <span class="system-tag">[SYSTEM]: Neural Link Active.</span>
+            </div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Enter query..." autocomplete="off">
+                <button id="send-btn">SEND</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- SPLIT JS INIT ---
+        Split(['#explorer', '#workspace', '#ai-panel'], {
+            sizes: [20, 50, 30],
+            minSize: 100,
+            gutterSize: 5,
+            cursor: 'col-resize'
+        });
+
+        // --- CONFIG ---
+        // Using relative paths to ensure we hit the host serving this file
+        const API_BASE = window.location.origin + "/api"; 
+        const WS_BASE = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + "/ws/terminal";
+
+        // --- DOM ELEMENTS ---
+        const chatInput = document.getElementById('chat-input');
+        const chatHistory = document.getElementById('chat-history');
+        const sendBtn = document.getElementById('send-btn');
+        const fileList = document.getElementById('file-list');
+        const editor = document.getElementById('editor-content');
+
+        // --- AI CHAT LOGIC ---
+        async function sendChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            // Add User Message
+            appendMessage('YOU', text, 'user');
+            chatInput.value = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                const data = await response.json();
+                appendMessage('BROCKSTON', data.response, 'ai');
+
+            } catch (err) {
+                console.error(err);
+                appendMessage('SYSTEM', `[ERROR]: ${err.message}`, 'error');
+            }
+        }
+
+        function appendMessage(sender, text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerHTML = `<strong>${sender}:</strong> ${text}`; // basic text, could render markdown later
+            chatHistory.appendChild(div);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        sendBtn.addEventListener('click', sendChat);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendChat(); });
+
+        // --- FILE SYSTEM LOGIC ---
+        async function loadFiles() {
+            try {
+                const res = await fetch(`${API_BASE}/files`);
+                const data = await res.json();
+                
+                fileList.innerHTML = ''; // Clear loading
+                data.files.forEach(file => {
+                    const el = document.createElement('div');
+                    el.className = 'file-item';
+                    const icon = file.type === 'folder' ? 'fa-folder' : 'fa-file-code';
+                    el.innerHTML = `<i class="fas ${icon}"></i> ${file.name}`;
+                    el.onclick = () => openFile(file.name);
+                    fileList.appendChild(el);
+                });
+            } catch (err) {
+                fileList.innerHTML = `<div style="color:red">Failed to load files: ${err.message}</div>`;
+            }
+        }
+
+        async function openFile(filename) {
+            try {
+                const res = await fetch(`${API_BASE}/read_file?filename=${encodeURIComponent(filename)}`);
+                if(!res.ok) throw new Error("Read failed");
+                const data = await res.json();
+                editor.value = data.content;
+            } catch (err) {
+                alert("Cannot read file: " + err.message);
+            }
+        }
+
+        // --- TERMINAL LOGIC (XTERM + WEBSOCKET) ---
+        const term = new Terminal({
+            theme: {
+                background: '#050505',
+                foreground: '#e0e0e0',
+                cursor: '#FF5F1F',
+                selection: '#FF5F1F40'
+            },
+            fontFamily: 'Menlo, Consolas, monospace',
+            fontSize: 12,
+            cursorBlink: true,
+            cols: 80,
+            rows: 10
+        });
+        
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        // Resize observer to refit terminal
+        new ResizeObserver(() => fitAddon.fit()).observe(document.getElementById('terminal-container'));
+
+        // Connect WS
+        const ws = new WebSocket(WS_BASE);
+        
+        ws.onopen = () => {
+            term.write('\r\n\x1b[1;32m[SYSTEM]: UPLINK ESTABLISHED.\x1b[0m\r\n');
+        };
+
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if (msg.type === 'output') {
+                // ZSH GARBAGE SCRUBBER (THE REGEX FILTER)
+                let clean = msg.data;
+                // Removing specific ZSH escape sequences
+                clean = clean.replace(/\[\?2004h/g, '').replace(/\[\?2004l/g, '');
+                term.write(clean);
+            }
+        };
+
+        term.onData(data => {
+            ws.send(JSON.stringify({ type: 'input', data: data }));
+        });
+
+        // --- INIT ---
+        loadFiles();
+        
+        // Focus check
+        window.addEventListener('focus', () => term.focus());
+
+    </script>
+</body>
+</html>
