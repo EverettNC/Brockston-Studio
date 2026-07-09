@@ -60,9 +60,17 @@ class ShimEngine:
     - Never silently succeed if the canonical path can't be imported.
     """
 
-    def __init__(self, target_path: str, dry_run: bool = False):
+    def __init__(self, target_path: str, dry_run: bool = False,
+                 vault=None, displace: bool = False):
         self.target = Path(target_path).resolve()
         self.dry_run = dry_run
+        # IsolationVault instance. When present, every file this engine
+        # displaces (old shims, or real-logic files under --displace) is
+        # moved into CHRISTMAN_ISOLATION and ledgered — never destroyed.
+        self.vault = vault
+        # displace=True is the explicit human approval required by shim
+        # rule 1 to move a real-logic file aside. Default stays False.
+        self.displace = displace
         self.installed: List[ShimResult] = []
         self.skipped: List[ShimResult] = []
 
@@ -110,13 +118,32 @@ class ShimEngine:
 
         # Safety: don't overwrite a file that has real logic
         if shim_path.exists() and not self._is_safe_to_shim(shim_path):
-            return ShimResult(
-                shim_path=str(shim_path),
-                original_import=issue.import_name,
-                canonical_import=canonical,
-                installed=False,
-                error=f"{shim_filename} already exists and contains real logic. "
-                      f"Manual migration required to: {canonical}",
+            if self.displace and self.vault is not None:
+                # Explicit approval given (--displace): move the real-logic
+                # file into the isolation vault, ledgered with hash, then
+                # place the shim. Nothing is destroyed. Restorable.
+                self.vault.disengage(
+                    shim_path,
+                    reason=f"displaced by shim bridging "
+                           f"'{issue.import_name}' → '{canonical}'",
+                )
+            else:
+                return ShimResult(
+                    shim_path=str(shim_path),
+                    original_import=issue.import_name,
+                    canonical_import=canonical,
+                    installed=False,
+                    error=f"{shim_filename} already exists and contains real logic. "
+                          f"Manual migration required to: {canonical} "
+                          f"(or re-run with --displace to vault it).",
+                )
+        elif shim_path.exists() and self.vault is not None and not self.dry_run:
+            # File is a previous shim or empty — still vault it before
+            # overwrite so the ledger holds the complete pathway history.
+            self.vault.disengage(
+                shim_path,
+                reason=f"stale shim replaced while bridging "
+                       f"'{issue.import_name}' → '{canonical}'",
             )
 
         shim_content = self._build_shim_content(
@@ -152,6 +179,12 @@ class ShimEngine:
         try:
             shim_path.write_text(shim_content, encoding="utf-8")
             result.installed = True
+            if self.vault is not None:
+                self.vault.record_unlocked(
+                    "shim",
+                    str(shim_path.relative_to(self.target)),
+                    reason=f"bridge '{issue.import_name}' → '{canonical}'",
+                )
         except OSError as e:
             result.installed = False
             result.error = str(e)
@@ -171,7 +204,9 @@ class ShimEngine:
             # Has real content — do not overwrite
             return False
         except OSError:
-            return True  # Can't read it, assume it's fine to try
+            # Rule 13: if we cannot read it, we cannot claim it's safe.
+            # Unreadable is NOT safe. Report it; never overwrite blind.
+            return False
 
     def _build_shim_content(
         self,

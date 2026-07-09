@@ -27,60 +27,99 @@ logger = logging.getLogger("christman.claude")
 
 router = APIRouter(prefix="/api", tags=["Claude"])
 
+DEFAULT_ANTHROPIC_MODEL = os.getenv(
+    "ANTHROPIC_MODEL",
+    "claude-sonnet-4-6",
+)
+FABLE5_MODEL = os.getenv("FABLE5_MODEL", DEFAULT_ANTHROPIC_MODEL)
+
+try:
+    from backend.being_context import FABLE5_IDENTITY
+except Exception:
+    FABLE5_IDENTITY = (
+        "You are Fable-5 — storyteller-educator of the Christman AI Family. "
+        "Warm narrative, precise teaching, full IDE compute when needed."
+    )
+
+
 @router.get("/claude/health")
 async def claude_health():
-    return {"status": "Claude instructor online", "model_default": "claude-3-5-sonnet-20241022"}
+    return {
+        "status": "Claude instructor online",
+        "model_default": DEFAULT_ANTHROPIC_MODEL,
+        "fable5_model": FABLE5_MODEL,
+        "api_key_set": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+    }
+
 
 class ClaudeRequest(BaseModel):
-    """Request schema for Claude.
-    
+    """Request schema for Claude / Fable-5.
+
     This is the ONLY sanctioned Claude integration for the Christman AI Family.
     All beings (Brockston, AlphaVox, UltimateEV, etc.) must route cognition
     through this when Anthropic is used. No direct anthropic calls elsewhere.
     """
     messages: List[Dict[str, Any]] = Field(
-        ..., 
-        description="Conversation messages in Anthropic format"
+        ...,
+        description="Conversation messages in Anthropic format",
     )
     system: str = Field(
         default="",
-        description="System prompt. When empty, Claude instructor persona is applied."
+        description="System prompt. When empty, Claude or Fable-5 persona is applied.",
     )
     model: str = Field(
-        default="claude-3-5-sonnet-20241022",
-        description="Target model. Use a valid Anthropic model ID (e.g. claude-3-5-sonnet-20241022). 'claude-fable5' will be treated as alias for the above."
+        default="",
+        description="Anthropic model ID. Empty → ANTHROPIC_MODEL / Fable-5 default. "
+        "'claude-fable5' / 'fable-5' map to FABLE5_MODEL.",
     )
     max_tokens: int = Field(default=4096, ge=1, le=200000)
     temperature: float = Field(default=0.7, ge=0.0, le=1.0)
     top_p: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     stop_sequences: Optional[List[str]] = None
+    persona: str = Field(
+        default="claude",
+        description="claude | fable5 — selects family identity when system is empty",
+    )
+
+
+def _resolve_anthropic_model(model: str, persona: str = "claude") -> str:
+    raw = (model or "").strip()
+    if raw in ("claude-fable5", "fable-5", "fable5", "Fable-5"):
+        return FABLE5_MODEL
+    if raw:
+        return raw
+    if (persona or "").lower() in ("fable5", "fable-5", "fable"):
+        return FABLE5_MODEL
+    return DEFAULT_ANTHROPIC_MODEL
 
 
 @router.post("/claude")
 async def call_claude(req: ClaudeRequest):
     """
     Claude endpoint — the single point of entry for Anthropic in this system.
-    
+
     - Uses AsyncAnthropic (non-blocking).
     - Properly extracts all text blocks.
     - Returns rich metadata for observability and teaching use.
-    - Forces the custom Claude model unless explicitly overridden.
     - Never pretends success when the call fails.
     """
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         logger.error("ANTHROPIC_API_KEY missing — Claude cannot serve beings.")
         raise HTTPException(
-            status_code=500, 
-            detail="ANTHROPIC_API_KEY environment variable not set"
+            status_code=500,
+            detail="ANTHROPIC_API_KEY environment variable not set",
         )
 
     client = AsyncAnthropic(api_key=api_key)
 
-    # Build payload — only include fields that have meaning
-    model = req.model
-    if model == "claude-fable5":
-        model = "claude-3-5-sonnet-20241022"  # map the old Fable5 alias to real model
+    persona = (req.persona or "claude").lower().strip()
+    model = _resolve_anthropic_model(req.model, persona)
+    is_fable = persona in ("fable5", "fable-5", "fable") or req.model in (
+        "claude-fable5",
+        "fable-5",
+        "fable5",
+    )
 
     payload = {
         "model": model,
@@ -93,15 +132,28 @@ async def call_claude(req: ClaudeRequest):
     system_prompt = req.system.strip() if req.system else None
     abilities = ABILITIES_COMPACT
     if system_prompt:
-        payload["system"] = system_prompt + "\n\n" + abilities + "\n\nYOU HAVE FULL CAPACITY TO RUN THE COMPUTE using tool calls (ls/read/run/write/patch via being eyes)."
+        payload["system"] = (
+            system_prompt
+            + "\n\n"
+            + abilities
+            + "\n\nYOU HAVE FULL CAPACITY TO RUN THE COMPUTE using tool calls "
+            "(ls/read/run/write/patch via being eyes)."
+        )
+    elif is_fable:
+        payload["system"] = (
+            FABLE5_IDENTITY
+            + "\n\n"
+            + abilities
+            + "\n\nYOU OPERATE THE IDE AND RUN COMPUTE — use <tool_call> for files and shell commands."
+        )
     else:
-        # Gentle default Claude teaching persona when nothing provided
         payload["system"] = (
             "You are a patient, warm, and precise educator in the Christman AI Family. "
             "You speak clearly, use short sentences when helpful, and always leave space "
             "for the student to think. You never talk down to anyone. "
             "Your goal is to help the person love themselves more through learning.\n\n"
-            + abilities + "\n\nYOU OPERATE THE IDE AND RUN COMPUTE — use <tool_call> for files and shell commands."
+            + abilities
+            + "\n\nYOU OPERATE THE IDE AND RUN COMPUTE — use <tool_call> for files and shell commands."
         )
 
     if req.top_p is not None:
@@ -140,9 +192,12 @@ async def call_claude(req: ClaudeRequest):
             )
             text = agent_result.get("text", "")
             tool_count = agent_result.get("tool_count", 0)
+            tag = "FABLE-5" if is_fable else "CLAUDE"
             return {
-                "content": f"[CLAUDE — {tool_count} compute ops via tools]: {text}",
+                "content": f"[{tag} — {tool_count} compute ops via tools]: {text}",
+                "response": f"[{tag} — {tool_count} compute ops via tools]: {text}",
                 "model": payload.get("model"),
+                "persona": "fable5" if is_fable else "claude",
                 "agent": True,
                 "tools_executed": agent_result.get("tools_executed", []),
                 "tool_count": tool_count,
@@ -153,21 +208,23 @@ async def call_claude(req: ClaudeRequest):
 
         # Extract every text block (Claude 3+ can return mixed content)
         text_parts = [
-            block.text 
-            for block in response.content 
+            block.text
+            for block in response.content
             if getattr(block, "type", None) == "text"
         ]
         full_text = "\n".join(text_parts).strip()
 
         logger.info(
-            f"Claude response | model={response.model} | "
+            f"{'Fable-5' if is_fable else 'Claude'} response | model={response.model} | "
             f"stop={response.stop_reason} | "
             f"tokens={response.usage.input_tokens}+{response.usage.output_tokens}"
         )
 
         return {
             "content": full_text,
+            "response": full_text,
             "model": response.model,
+            "persona": "fable5" if is_fable else "claude",
             "stop_reason": response.stop_reason,
             "usage": {
                 "input_tokens": response.usage.input_tokens,
@@ -182,8 +239,12 @@ async def call_claude(req: ClaudeRequest):
         raise HTTPException(status_code=500, detail=f"Claude failed: {str(e)}")
 
 
-# Legacy alias for old /api/fable5 calls (if any clients still hit it)
 @router.post("/fable5")
-async def call_claude_fable5_alias(req: ClaudeRequest):
-    """Legacy alias for old Fable5 path. Routes through Claude."""
-    return await call_claude(req)
+async def call_fable5(req: ClaudeRequest):
+    """Fable-5 — Christman storyteller-educator on Anthropic (first-class instructor)."""
+    # Force Fable-5 persona + model lane
+    data = req.model_dump()
+    data["persona"] = "fable5"
+    if not data.get("model") or data["model"] in ("", "claude-fable5"):
+        data["model"] = "fable-5"
+    return await call_claude(ClaudeRequest(**data))

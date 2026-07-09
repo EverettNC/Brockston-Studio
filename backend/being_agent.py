@@ -396,6 +396,28 @@ def _review_finalize_prompt(
     tool_count: int,
     instructor: str = "family",
 ) -> str:
+    if instructor in ("kimi", "kimi26", "kimi27", "k2.6", "k2.7", "nemo", "nemotron"):
+        who = {
+            "kimi": "Kimi K2.6",
+            "kimi26": "Kimi K2.6",
+            "k2.6": "Kimi K2.6",
+            "kimi27": "Kimi K2.7",
+            "k2.7": "Kimi K2.7",
+            "nemo": "Nemotron",
+            "nemotron": "Nemotron",
+        }.get(instructor, "Kimi")
+        return (
+            f"You are {who} — senior engineer. Write a useful project review for Everett.\n\n"
+            f"Project: {scope_root}\n"
+            f"Your tool runs on disk ({tool_count} tools):\n{digest}\n\n"
+            "Use what the digest shows — ls listings, read previews, rg output are verified facts.\n"
+            "Do not invent files that never appeared in the digest. Do not nitpick the tool workflow.\n"
+            "Write like a code reviewer, not a compliance auditor. Minimize 'not verified' — "
+            "only use it when you truly lack data for a specific claim.\n"
+            "Sections: ARCHITECTURE, CRITICAL, WARNING, CLEAN, VERDICT (PASS / PARTIAL / FAIL).\n"
+            "VERDICT grades the project from findings — not whether exploration was perfect.\n"
+            "Plain English. No tool markup."
+        )
     return (
         f"User request:\n{message}\n\n"
         f"Project boundary: {scope_root}\n"
@@ -649,29 +671,56 @@ async def execute_being_tool(
         return {"status": "error", "detail": str(exc)}
 
 
-async def _fast_direct_generate(prompt: str) -> str:
-    """Direct Ollama call for compute agent steps — uses CODER model, not chat GENERAL."""
-    try:
-        async with httpx.AsyncClient(timeout=AGENT_OLLAMA_TIMEOUT) as client:
-            r = await client.post(
-                f"{OLLAMA_BASE}/api/chat",
-                json={
-                    "model": AGENT_MODEL,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
-                    "options": {
-                        "num_predict": AGENT_NUM_PREDICT,
-                        "num_ctx": AGENT_NUM_CTX,
-                        "temperature": 0.15,
-                        "top_p": 0.85,
-                    },
+async def _ollama_chat(model: str, prompt: str, *, timeout: float, num_predict: int) -> str:
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        r = await client.post(
+            f"{OLLAMA_BASE}/api/chat",
+            json={
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {
+                    "num_predict": num_predict,
+                    "num_ctx": AGENT_NUM_CTX,
+                    "temperature": 0.15,
+                    "top_p": 0.85,
                 },
+            },
+        )
+        r.raise_for_status()
+        return r.json()["message"]["content"]
+
+
+async def _fast_direct_generate(prompt: str) -> str:
+    """Local finalize — try GENERAL first (fast), then CODER. Never hang the agent on 32B."""
+    general = REVIEW_FINALIZE_MODEL or os.getenv("LLM_MODEL_GENERAL", "llama3.2")
+    # Short timeout for finalize so NVIDIA agent replies don't die waiting on a cold 32B
+    fast_timeout = min(float(os.getenv("BEING_AGENT_FINALIZE_TIMEOUT_SEC", "45")), AGENT_OLLAMA_TIMEOUT)
+    models = []
+    if general and general != AGENT_MODEL:
+        models.append(general)
+    models.append(AGENT_MODEL)
+    last_err: Optional[Exception] = None
+    for model in models:
+        try:
+            text = await _ollama_chat(
+                model,
+                prompt,
+                timeout=fast_timeout,
+                num_predict=min(AGENT_NUM_PREDICT, 512),
             )
-            r.raise_for_status()
-            return r.json()["message"]["content"]
-    except Exception as e:
-        logger.warning("[being_agent] agent ollama failed model=%s: %s", AGENT_MODEL, e)
-        return f"[compute error - model {AGENT_MODEL} not responding: {e}]"
+            if text and text.strip():
+                return text
+        except Exception as e:
+            last_err = e
+            logger.warning("[being_agent] ollama finalize failed model=%s: %s", model, e)
+    err = last_err or RuntimeError("empty response")
+    return f"[compute error - model {AGENT_MODEL} not responding: {err}]"
+
+
+def _is_compute_error(text: str) -> bool:
+    t = (text or "").strip().lower()
+    return t.startswith("[compute error") or "not responding" in t
 
 
 def _scoped_agent_prompt(scope_root: Optional[str]) -> str:
@@ -818,14 +867,33 @@ async def run_agent_loop(
             finalize_prompt = (
                 f"User request:\n{message}\n\n"
                 f"TOOL RESULTS DIGEST:\n{digest}\n\n"
-                "Write a direct plain-text summary for Everett. Plain English only."
+                "Write a direct plain-text summary for Everett. Plain English only. "
+                "Do not emit tool_call blocks. Use only the digest facts."
             )
             last_text = await finalize_gen(finalize_prompt)
+            # If local Ollama finalize dies, never surface a compute-error as the answer
+            if _is_compute_error(last_text) or not strip_tool_blocks(last_text):
+                logger.warning(
+                    "[being_agent] Finalize failed after %d tool(s) — retrying GENERAL, then disk digest",
+                    len(tools_executed),
+                )
+                try:
+                    last_text = await _review_finalize_generate(finalize_prompt)
+                except Exception:
+                    last_text = ""
+                if _is_compute_error(last_text) or not strip_tool_blocks(last_text):
+                    last_text = _fallback_summary_from_tools(
+                        tools_executed, user_message=message
+                    )
 
     last_text = strip_tool_blocks(last_text)
-    if tools_executed and (_is_tool_leak(last_text) or len(last_text) < 40):
+    if tools_executed and (
+        _is_tool_leak(last_text)
+        or len(last_text) < 40
+        or _is_compute_error(last_text)
+    ):
         logger.warning(
-            "[being_agent] Model leaked tool XML or empty summary after %d tool(s) — using disk digest",
+            "[being_agent] Model leaked tool XML, empty, or compute-error after %d tool(s) — using disk digest",
             len(tools_executed),
         )
         last_text = _fallback_summary_from_tools(tools_executed, user_message=message)
@@ -837,6 +905,179 @@ async def run_agent_loop(
         "tool_count": len(tools_executed),
         "agent_steps": steps_used,
     }
+
+
+async def run_nvidia_agent(
+    svc: Any,
+    *,
+    message: str,
+    context: str,
+    mode: str = "code",
+    max_steps: int = 6,
+    scope_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Tool loop for NVIDIA-backed instructors (Nemotron, NemoClaw).
+
+    Finalize stays on the same NVIDIA model — do NOT hand off to local
+    qwen2.5-coder:32b (cold/slow 32B was wiping 14-tool runs with compute errors).
+    """
+    loop = asyncio.get_event_loop()
+
+    async def generate(prompt: str) -> str:
+        return await loop.run_in_executor(
+            None,
+            lambda: svc.generate_content(
+                prompt,
+                mode=mode,
+                context=None,
+                model=None if getattr(svc, "uses_nvidia", False) else AGENT_MODEL,
+            ),
+        )
+
+    async def nvidia_finalize(prompt: str) -> str:
+        # Prefer the NVIDIA line that just ran the tools
+        try:
+            text = await generate(prompt)
+            if text and not _is_compute_error(text):
+                return text
+        except Exception as exc:
+            logger.warning("[being_agent] NVIDIA finalize failed: %s", exc)
+        # Fast local GENERAL only as backup
+        return await _review_finalize_generate(prompt)
+
+    return await run_being_agent(
+        generate,
+        message=message,
+        context=context,
+        max_steps=max_steps,
+        scope_root=scope_root,
+        finalize_generate=nvidia_finalize,
+        review_instructor="nemotron" if scope_root else None,
+    )
+
+
+async def run_nemo_agent(
+    nemo_svc: Any,
+    *,
+    message: str,
+    context: str,
+    mode: str = "code",
+    max_steps: int = 6,
+    scope_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    return await run_nvidia_agent(
+        nemo_svc,
+        message=message,
+        context=context,
+        mode=mode,
+        max_steps=max_steps,
+        scope_root=scope_root,
+    )
+
+
+async def run_nemoclaw_agent(
+    nemoclaw_svc: Any,
+    *,
+    message: str,
+    context: str,
+    max_steps: int = 6,
+    scope_root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """NemoClaw tool loop — finalize on NemoClaw/Nemotron, never cold 32B Ollama."""
+    loop = asyncio.get_event_loop()
+
+    async def generate(prompt: str) -> str:
+        return await loop.run_in_executor(
+            None,
+            lambda: nemoclaw_svc.generate_content(prompt, context=None),
+        )
+
+    async def nemoclaw_finalize(prompt: str) -> str:
+        try:
+            text = await generate(prompt)
+            if text and not _is_compute_error(text):
+                return text
+        except Exception as exc:
+            logger.warning("[being_agent] NemoClaw finalize failed: %s", exc)
+        return await _review_finalize_generate(prompt)
+
+    return await run_being_agent(
+        generate,
+        message=message,
+        context=context,
+        max_steps=max_steps,
+        scope_root=scope_root,
+        finalize_generate=nemoclaw_finalize,
+        review_instructor="nemotron" if scope_root else None,
+    )
+
+
+async def run_kimi_agent(
+    kimi_svc: Any,
+    *,
+    message: str,
+    context: str,
+    mode: str = "codelab",
+    domain: Optional[str] = None,
+    max_steps: int = 6,
+    scope_root: Optional[str] = None,
+    variant: str = "k2.6",
+    model: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Kimi — NVIDIA K2.6 / K2.7 explores via <tool_call> and writes the verdict."""
+    loop = asyncio.get_event_loop()
+    review_key = "kimi27" if str(variant).lower() in ("k2.7", "k27", "kimi27") else "kimi"
+
+    async def generate(prompt: str) -> str:
+        trimmed = _trim_conversation(prompt, max_chars=8000)
+
+        def _call() -> str:
+            result = kimi_svc.interact(
+                message=trimmed,
+                mode=mode,
+                context=None,
+                domain=domain,
+                thinking=False,
+                variant=variant,
+                model=model,
+            )
+            return result.get("text", "")
+
+        return await loop.run_in_executor(None, _call)
+
+    async def kimi_finalize(prompt: str) -> str:
+        trimmed = _trim_conversation(prompt, max_chars=12000)
+
+        def _call() -> str:
+            result = kimi_svc.interact(
+                message=trimmed,
+                mode=mode,
+                context=None,
+                domain=domain,
+                thinking=False,
+                variant=variant,
+                model=model,
+            )
+            return result.get("text", "")
+
+        try:
+            return await asyncio.wait_for(
+                loop.run_in_executor(None, _call),
+                timeout=REVIEW_NEMOTRON_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.error("[being_agent] Kimi finalize timed out variant=%s", variant)
+            return ""
+
+    return await run_being_agent(
+        generate,
+        message=message,
+        context=context,
+        max_steps=max_steps,
+        scope_root=scope_root,
+        finalize_generate=kimi_finalize,
+        review_instructor=review_key if scope_root else None,
+    )
 
 
 async def run_being_agent(

@@ -46,11 +46,26 @@ def sdk_root() -> Path:
     return CHRISTMAN_SOUND_ROOT / "christman_voice_sdk"
 
 
-# Read-aloud: map chat beings to male Christman reference WAVs (Brockston uvclass, etc.)
+# Read-aloud: map chat instructors → Christman being reference WAVs
 TTS_BEING_ALIASES: dict[str, str] = {
     "family": "brockston",
     "claude": "brockston",
+    "fable5": "brockston",
+    "fable-5": "brockston",
+    "auto": "brockston",
     "default": "brockston",
+    # NVIDIA swarm → Nemo pack when present, else brockston fallback in find_reference_wav
+    "nemoclaw": "nemo",
+    "nemotron": "nemo",
+    "mistral": "brockston",
+    "kimi": "kimi",
+    "kimi26": "kimi",
+    "kimi27": "kimi",
+    "k2.6": "kimi",
+    "k2.7": "kimi",
+    "grok": "ultimateev",
+    "superheavy": "ultimateev",
+    "super_heavy_grok": "ultimateev",
 }
 
 # macOS `say` male fallbacks when XTTS is unavailable (all English male voices on this Mac)

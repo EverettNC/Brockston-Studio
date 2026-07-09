@@ -44,6 +44,18 @@ EAR_CANAL_SIGNATURES = [
     "christman_ear_canal",
     "ear_canal",
     "EarCanal",
+    # Current runtime stack — christman_sound and its EAR_CANAL components
+    # (per Christman Infrastructure manifest v1.4.0). Without these, a being
+    # wired to the live stack is invisible to the explorer.
+    "christman_sound",
+    "christman_sound_media",
+    "EAR.py",
+    "SPEAK.py",
+    "TONE.py",
+    "PHONEMES.py",
+    "VOICE_PROFILE.py",
+    "from christman_sound",
+    "import christman_sound",
 ]
 
 VOICE_SDK_SIGNATURES = [

@@ -39,17 +39,49 @@ OCR_SAFE_PACKAGES = [
     "pymupdf",             # PDF OCR fallback — MIT license, safe
 ]
 
-# MCP tool template for Derek
+# MCP tool template for Derek.
+# Rule 1 / Rule 13: this tool does REAL work or reports a REAL failure.
+# It runs the actual explore pipeline against the target and returns the
+# genuine inventory. If the installer package isn't importable in the MCP
+# server's environment, it says exactly that — it never claims success.
 DEREK_MCP_TOOL_TEMPLATE = '''
 @mcp.tool()
 async def {tool_name}(target: str) -> dict:
     """Christman Media Installer — {tool_description}
-    
+
     Installed by: Christman Media Installer v{version}
     Being: {being_name}
+    Runs the real explore pipeline. Truth is the product.
     """
-    # TODO: Wire to installer.py public API
-    return {{"status": "registered", "tool": "{tool_name}", "target": target}}
+    try:
+        from christman_media_installer.explorer import Explorer
+    except ImportError as e:
+        return {{
+            "status": "UNAVAILABLE",
+            "tool": "{tool_name}",
+            "target": target,
+            "reason": f"christman_media_installer is not importable here: {{e}}. "
+                      "Install it in this environment before this tool can work.",
+        }}
+    try:
+        report = Explorer(target).explore()
+    except (FileNotFoundError, NotADirectoryError) as e:
+        return {{
+            "status": "FAILED",
+            "tool": "{tool_name}",
+            "target": target,
+            "reason": str(e),
+        }}
+    return {{
+        "status": "OK",
+        "tool": "{tool_name}",
+        "target": target,
+        "modules_found": report.module_count,
+        "broken_imports": report.broken_count,
+        "shimmable": report.shimmable_count,
+        "voice_files": len(report.voice_files),
+        "mcp_server_files": len(report.mcp_server_files),
+    }}
 '''
 
 
@@ -65,15 +97,21 @@ class Installer:
         target_path: str,
         being_profile: BeingProfile,
         dry_run: bool = False,
+        vault=None,
     ):
         self.target = Path(target_path).resolve()
         self.profile = being_profile
         self.dry_run = dry_run
+        # IsolationVault: every capability this installer unlocks is
+        # ledgered; pre-flight cache purges are ledgered. The ledger is
+        # the pathway's memory.
+        self.vault = vault
         self.installed_packages: List[str] = []
         self.failed_packages: List[Tuple[str, str]] = []
         self.env_keys_written: List[str] = []
         self.mcp_tools_written: List[str] = []
         self.init_files_created: List[str] = []
+        self.caches_purged: List[str] = []
 
     def install(self) -> bool:
         """Run the full install sequence for this being. Returns True if successful."""
@@ -82,6 +120,7 @@ class Installer:
 
         success = True
 
+        self._preflight_hygiene()
         success &= self._ensure_directory_is_package()
         success &= self._install_core_packages()
         success &= self._write_env_defaults()
@@ -92,8 +131,74 @@ class Installer:
         if self.profile.needs_ocr:
             self._install_ocr_safe()
 
+        self._record_unlocks()
         self._log_summary()
         return success
+
+    # ──────────────────────────────────────────
+    # PRE-FLIGHT HYGIENE (infrastructure manifest v1.4.0)
+    # ──────────────────────────────────────────
+    def _preflight_hygiene(self) -> None:
+        """Purge .pyc, __pycache__, and stale audio_cache so execution truth
+        is never faked by stale bytecode or cached audio. Caches are deleted,
+        not vaulted — but every purge is ledgered. Everett's decision,
+        recorded 2026-07-03."""
+        if self.vault is None:
+            logger.info("  ⚠ No vault attached — pre-flight purges will not be ledgered.")
+        purge_targets = []
+        purge_targets.extend(self.target.rglob("__pycache__"))
+        purge_targets.extend(self.target.rglob("*.pyc"))
+        purge_targets.extend(self.target.rglob("audio_cache"))
+
+        # Never reach inside the vault itself
+        purge_targets = [
+            p for p in purge_targets
+            if "CHRISTMAN_ISOLATION" not in p.parts
+        ]
+
+        if not purge_targets:
+            logger.info("  ✅ Pre-flight hygiene: nothing to purge.")
+            return
+
+        for p in purge_targets:
+            if not p.exists():
+                continue  # parent __pycache__ may already be gone
+            if self.vault is not None:
+                self.vault.purge_cache(
+                    p, reason="pre-flight hygiene (manifest v1.4.0)"
+                )
+            elif not self.dry_run:
+                import shutil as _shutil
+                if p.is_dir():
+                    _shutil.rmtree(p)
+                else:
+                    p.unlink()
+                logger.info(f"  🧹 Purged cache (unledgered): {p.name}")
+            self.caches_purged.append(str(p.relative_to(self.target)))
+
+    # ──────────────────────────────────────────
+    # LEDGER UNLOCKS
+    # ──────────────────────────────────────────
+    def _record_unlocks(self) -> None:
+        """Write every enabled capability into the vault ledger."""
+        if self.vault is None or self.dry_run:
+            return
+        for pkg in self.installed_packages:
+            self.vault.record_unlocked(
+                "package", pkg, reason=f"core media stack for {self.profile.name}"
+            )
+        for key in self.env_keys_written:
+            self.vault.record_unlocked(
+                "env_key", key, reason="env defaults"
+            )
+        for tool in self.mcp_tools_written:
+            self.vault.record_unlocked(
+                "mcp_tool", tool, reason=f"MCP wiring for {self.profile.name}"
+            )
+        for init in self.init_files_created:
+            self.vault.record_unlocked(
+                "init_file", init, reason="package structure"
+            )
 
     # ──────────────────────────────────────────
     # ENSURE PACKAGE STRUCTURE

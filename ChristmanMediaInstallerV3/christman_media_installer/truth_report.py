@@ -47,6 +47,10 @@ class TruthReport:
     verifier: VerifierReport
     security: SecurityReport
     repair_packet: Optional[RepairPacket] = None
+    # Isolation vault session summary (dict from IsolationVault.session_summary()).
+    # Optional so existing callers keep working; when present, the report
+    # shows exactly what this session disengaged, purged, and unlocked.
+    isolation: Optional[dict] = None
 
     def _determine_status(self) -> str:
         """Determine the final status. Honest. No exceptions."""
@@ -267,6 +271,32 @@ class TruthReport:
 
         # ──────────────────────────────────────
         # NEXT COMMAND
+        # ──────────────────────────────────────
+        # ISOLATION — what this session moved, purged, unlocked
+        # ──────────────────────────────────────
+        if self.isolation is not None:
+            line()
+            line("🗄  ISOLATION")
+            line(f"  Session:                {self.isolation.get('session_id', '?')}")
+            dis = self.isolation.get("disengaged", [])
+            pur = self.isolation.get("purged", [])
+            unl = self.isolation.get("unlocked", [])
+            line(f"  Disengaged (vaulted):   {len(dis)}")
+            for r in dis:
+                line(f"    📦 {r['original_path']} → {r['vault_path']}")
+                line(f"       sha256 {r['sha256']}")
+                line(f"       why: {r['reason']}")
+            line(f"  Caches purged (logged): {len(pur)}")
+            for r in pur:
+                line(f"    🧹 {r['original_path']}")
+            line(f"  Unlocked:               {len(unl)}")
+            for r in unl:
+                line(f"    🔓 {r['detail']}")
+            if dis:
+                sid = self.isolation.get("session_id", "<session>")
+                line(f"  Undo: christman-media restore --target {self.target_path} "
+                     f"--session {sid}")
+
         # ──────────────────────────────────────
         line()
         line("▶  NEXT COMMAND")

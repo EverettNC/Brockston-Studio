@@ -61,11 +61,17 @@ class SpeechService:
         self.api_key = api_key or os.getenv("SPEECH_SERVICE_API_KEY")
         self.base_url = "https://api.speech-service.local"
         self.timeout = 60.0  # 60 seconds for audio processing
+        # Rule 13 honesty — last engine used for readback (xtts vs robot fallback)
+        self.last_engine: str = "unknown"
+        self.last_engine_detail: str = ""
 
         if self.api_key:
             logger.info("Speech service initialized with configured API key")
         else:
-            logger.info("Speech service initialized in MOCK mode for local testing")
+            logger.info(
+                "Speech service initialized without SPEECH_SERVICE_API_KEY "
+                "(local christman_sound / macOS say only — not cloud STT mock for TTS)"
+            )
 
     async def transcribe_audio(self, audio_data: bytes, filename: str = "audio.webm") -> str:
         """
@@ -167,13 +173,18 @@ class SpeechService:
 
         express_audio = self._audio_from_voice_center_express(text, being)
         if express_audio:
+            self.last_engine = "voice_center_express"
+            self.last_engine_detail = f"being={being}"
             return express_audio
 
         christman_audio = self._synthesize_christman_sound(text, being)
         if christman_audio:
+            self.last_engine = "christman_sound_xtts"
+            self.last_engine_detail = f"being={being}"
             return christman_audio
 
         # macOS say — male voice map (Daniel, Fred, Alex, etc.)
+        # HONESTY: this is robot fallback, not closed-loop christman_sound.
         voice = macos_voice_for_being(voice_id)
         if voice_id and voice_id not in ("default", "") and voice_id in (
             "Daniel", "Fred", "Alex", "Albert", "Ralph", "Reed", "Eddy", "Grandpa"
@@ -202,9 +213,15 @@ class SpeechService:
                 raise RuntimeError(f"ffmpeg failed: {r.stderr.decode()[:200]}")
 
             audio = Path(mp3_path).read_bytes()
+            self.last_engine = "macos_say_fallback"
+            self.last_engine_detail = (
+                f"voice={voice} being={being} - closed-loop XTTS unavailable "
+                f"(need torch+TTS in backend/venv)"
+            )
             logger.error(
                 "[TTS] ROBOT VOICE FALLBACK — macOS say voice=%s being=%s (%d chars). "
-                "christman_sound XTTS did not run. Check backend/venv has torch+TTS.",
+                "christman_sound XTTS did not run. Install torch+TTS into backend/venv "
+                "for closed-loop christman_sound (skill: closed-loop audio production).",
                 voice,
                 being,
                 len(text),

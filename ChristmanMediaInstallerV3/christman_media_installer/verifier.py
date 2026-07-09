@@ -229,15 +229,26 @@ class Verifier:
     # ──────────────────────────────────────────
     # SPEAKER PLAYBACK
     # ──────────────────────────────────────────
+    def _run_speech_binary(self, argv: list) -> bool:
+        """Run one fallback speech binary. Returns True only if it actually ran
+        and exited 0. A missing binary or timeout is a recorded failure, never
+        a crash — Rule 6: the auditor fails loud, it does not fall over."""
+        try:
+            result = subprocess.run(argv, capture_output=True, timeout=8)
+            return result.returncode == 0
+        except FileNotFoundError:
+            return False
+        except subprocess.TimeoutExpired:
+            return False
+        except OSError:
+            return False
+
     def _test_speaker_playback(self) -> None:
         """Verify fallback speech works. macOS 'say' or espeak."""
         # Try macOS say (silent — use /dev/null output)
-        result = subprocess.run(
-            ["say", "-v", "Alex", "Christman media installer speaker test"],
-            capture_output=True,
-            timeout=8,
-        )
-        if result.returncode == 0:
+        if self._run_speech_binary(
+            ["say", "-v", "Alex", "Christman media installer speaker test"]
+        ):
             self._add(TestResult(
                 name="speaker_playback",
                 passed=True,
@@ -248,12 +259,7 @@ class Verifier:
 
         # Try espeak
         for cmd in ["espeak", "espeak-ng"]:
-            result = subprocess.run(
-                [cmd, "test"],
-                capture_output=True,
-                timeout=8,
-            )
-            if result.returncode == 0:
+            if self._run_speech_binary([cmd, "test"]):
                 self._add(TestResult(
                     name="speaker_playback",
                     passed=True,
@@ -276,14 +282,17 @@ class Verifier:
                 critical=False,
             ))
             return
-        except Exception:
-            pass
+        except Exception as e:
+            sounddevice_reason = f"{type(e).__name__}: {e}"
+        else:
+            sounddevice_reason = "unreachable"
 
         self._add(TestResult(
             name="speaker_playback",
             passed=False,
             message="❌ No working fallback speech system found. "
-                    "Install espeak or run on macOS with 'say' available.",
+                    "Install espeak or run on macOS with 'say' available. "
+                    f"(sounddevice fallback: {sounddevice_reason})",
             critical=False,
         ))
 

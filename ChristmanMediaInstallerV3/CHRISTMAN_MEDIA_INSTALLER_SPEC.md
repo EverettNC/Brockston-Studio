@@ -416,7 +416,7 @@ Target profiles:
 The first version only needs to do this:
 
 ```bash
-christman-media install --target ~/Downloads/DerekMCPServer --being Derek
+christman-media install --target /Users/EverettN/Downloads/DerekMCPServer --being Derek
 ```
 
 And produce:

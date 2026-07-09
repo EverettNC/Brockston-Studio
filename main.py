@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import subprocess
 import pty
 import select
@@ -58,18 +62,136 @@ try:
 except Exception as e:
     logger.warning(f"Being Eyes not available: {e}")
 
+# Nemotron — NVIDIA Nemotron 3 Ultra instructor
+try:
+    from backend.nemo_service import get_nemo_service
+    _nemo_svc = get_nemo_service()
+    logger.info("Nemotron linked — available at /api/nemotron")
+except Exception as e:
+    _nemo_svc = None
+    logger.warning(f"Nemotron service not available: {e}")
+
+# NemoClaw — agent instructor (Nemotron + tool loop)
+try:
+    from backend.nemoclaw_service import get_nemoclaw_service
+    _nemoclaw_svc = get_nemoclaw_service()
+    logger.info("NemoClaw linked — available at /api/nemoclaw")
+except Exception as e:
+    _nemoclaw_svc = None
+    logger.warning(f"NemoClaw service not available: {e}")
+
+# Mistral Medium 3.5 — NVIDIA reasoning instructor
+try:
+    from backend.mistral_service import get_mistral_service
+    _mistral_svc = get_mistral_service()
+    logger.info("Mistral linked — available at /api/mistral")
+except Exception as e:
+    _mistral_svc = None
+    logger.warning(f"Mistral service not available: {e}")
+
+# Kimi K2.6 + K2.7 — NVIDIA NIM learning tutor swarm (partner deck + code + kids)
+try:
+    from backend.kimi_service import get_kimi_service
+    _kimi_svc = get_kimi_service()
+    if not _kimi_svc.is_available:
+        logger.warning("Kimi linked but not available (NVIDIA_KIMI_API_KEY or proxy)")
+    else:
+        logger.info("Kimi NVIDIA NIM swarm linked — /api/kimi (K2.6 + K2.7)")
+except Exception as e:
+    _kimi_svc = None
+    logger.warning(f"Kimi service not available: {e}")
+
+# Super Heavy Grok — Big Daddy xAI flagship
+try:
+    from backend.grok_service import get_grok_service
+    _grok_svc = get_grok_service()
+    if not _grok_svc.is_available:
+        logger.warning("Super Heavy Grok offline — set XAI_API_KEY or GROK_API_KEY")
+    else:
+        logger.info("Super Heavy Grok linked — available at /api/grok")
+except Exception as e:
+    _grok_svc = None
+    logger.warning(f"Grok service not available: {e}")
+
 class ChatRequest(BaseModel):
+    message: str
+    context: str | None = None
+
+class NemotronRequest(BaseModel):
+    message: str
+    mode: str = "partner"
+    context: str | None = None
+
+class NemoClawRequest(BaseModel):
+    message: str
+    context: str | None = None
+
+class MistralRequest(BaseModel):
+    message: str
+    context: str | None = None
+
+class KimiRequest(BaseModel):
+    message: str
+    mode: str = "tutor"
+    context: str | None = None
+    domain: str | None = None
+    variant: str = "k2.6"  # k2.6 | k2.7
+    model: str | None = None
+
+class GrokRequest(BaseModel):
     message: str
     context: str | None = None
 
 class ProjectReviewRequest(BaseModel):
     path: str | None = None
     message: str | None = None
-    instructor: str = "family"  # family | claude
+    instructor: str = "family"  # + fable5 | grok | kimi26 | kimi27 | auto
 
 @app.get("/api/health")
 async def health_check():
     from backend.being_agent import AGENT_MODEL
+    from backend.nemo_service import NVIDIA_NEMO_MODEL
+    from backend.mistral_service import NVIDIA_MISTRAL_MODEL
+    from backend.kimi_service import NVIDIA_KIMI_K26_MODEL, NVIDIA_KIMI_K27_MODEL
+    from backend.grok_service import GROK_MODEL as XAI_GROK_MODEL
+
+    fable5_model = os.getenv("FABLE5_MODEL", os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"))
+    anthropic_key = bool(os.getenv("ANTHROPIC_API_KEY", "").strip())
+
+    nemo_wiring = (
+        _nemo_svc.wiring_info("partner") if _nemo_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    nemo_code_wiring = (
+        _nemo_svc.wiring_info("code") if _nemo_svc else nemo_wiring
+    )
+    nemoclaw_wiring = (
+        _nemoclaw_svc.wiring_info() if _nemoclaw_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    mistral_wiring = (
+        _mistral_svc.wiring_info() if _mistral_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    kimi26_wiring = (
+        _kimi_svc.wiring_info("k2.6") if _kimi_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    kimi27_wiring = (
+        _kimi_svc.wiring_info("k2.7") if _kimi_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    grok_wiring = (
+        _grok_svc.wiring_info() if _grok_svc else {"backend": "offline", "label": "unavailable"}
+    )
+    kimi_key_set = bool(_kimi_svc and _kimi_svc.api_key_configured)
+
+    # Stronger NVIDIA labels for health / Settings
+    if kimi26_wiring.get("backend") == "nvidia":
+        kimi26_wiring = {
+            **kimi26_wiring,
+            "label": f"{kimi26_wiring.get('model', NVIDIA_KIMI_K26_MODEL)} (NVIDIA NIM · Kimi)",
+        }
+    if kimi27_wiring.get("backend") == "nvidia":
+        kimi27_wiring = {
+            **kimi27_wiring,
+            "label": f"{kimi27_wiring.get('model', NVIDIA_KIMI_K27_MODEL)} (NVIDIA NIM · Kimi)",
+        }
 
     return {
         "status": "10 Toes Down",
@@ -81,6 +203,12 @@ async def health_check():
             "coder": LLM_MODEL_CODER,
             "being_agent": AGENT_MODEL,
             "ultimateev": LLM_MODEL_CODER,
+            "nemotron": nemo_wiring.get("label", NVIDIA_NEMO_MODEL),
+            "mistral": mistral_wiring.get("label", NVIDIA_MISTRAL_MODEL),
+            "kimi26": kimi26_wiring.get("label", NVIDIA_KIMI_K26_MODEL),
+            "kimi27": kimi27_wiring.get("label", NVIDIA_KIMI_K27_MODEL),
+            "fable5": f"{fable5_model} (Fable-5 · Anthropic)",
+            "grok": grok_wiring.get("label", XAI_GROK_MODEL),
         },
         "instructors": {
             "family": {
@@ -94,18 +222,102 @@ async def health_check():
             "claude": {
                 "name": "Claude",
                 "backend": "anthropic",
-                "model": "claude-sonnet-4",
-                "label": "claude-sonnet-4 (Anthropic API)",
+                "model": os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
+                "label": f"{os.getenv('ANTHROPIC_MODEL', 'claude-sonnet-4-6')} (Anthropic)",
                 "api_key_env": "ANTHROPIC_API_KEY",
-                "api_key_set": bool(os.getenv("ANTHROPIC_API_KEY", "").strip()),
+                "api_key_set": anthropic_key,
+            },
+            "fable5": {
+                "name": "Fable-5",
+                "backend": "anthropic" if anthropic_key else "offline",
+                "model": fable5_model,
+                "label": f"{fable5_model} (Fable-5 · Anthropic)",
+                "api_key_env": "ANTHROPIC_API_KEY",
+                "api_key_set": anthropic_key,
+            },
+            "nemoclaw": {
+                "name": "NemoClaw",
+                "backend": nemoclaw_wiring.get("backend", "offline"),
+                "model": nemo_code_wiring.get("model", NVIDIA_NEMO_MODEL),
+                "label": nemoclaw_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_NEMO_API_KEY",
+                "api_key_set": bool(_nemo_svc and _nemo_svc.api_key_configured),
+            },
+            "nemotron": {
+                "name": "Nemotron",
+                "backend": nemo_wiring.get("backend", "offline"),
+                "model": nemo_wiring.get("model", NVIDIA_NEMO_MODEL),
+                "label": nemo_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_NEMO_API_KEY",
+                "api_key_set": bool(_nemo_svc and _nemo_svc.api_key_configured),
+            },
+            "mistral": {
+                "name": "Mistral",
+                "backend": mistral_wiring.get("backend", "offline"),
+                "model": mistral_wiring.get("model", NVIDIA_MISTRAL_MODEL),
+                "label": mistral_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_MISTRAL_API_KEY",
+                "api_key_set": bool(_mistral_svc and _mistral_svc.uses_nvidia),
+            },
+            "kimi26": {
+                "name": "Kimi · NVIDIA K2.6",
+                "backend": kimi26_wiring.get("backend", "offline"),
+                "model": kimi26_wiring.get("model", NVIDIA_KIMI_K26_MODEL),
+                "label": kimi26_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_KIMI_API_KEY",
+                "api_key_set": kimi_key_set,
+            },
+            "kimi27": {
+                "name": "Kimi · NVIDIA K2.7",
+                "backend": kimi27_wiring.get("backend", "offline"),
+                "model": kimi27_wiring.get("model", NVIDIA_KIMI_K27_MODEL),
+                "label": kimi27_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_KIMI_API_KEY",
+                "api_key_set": kimi_key_set,
+            },
+            "kimi": {
+                "name": "Kimi · NVIDIA K2.6",
+                "backend": kimi26_wiring.get("backend", "offline"),
+                "model": kimi26_wiring.get("model", NVIDIA_KIMI_K26_MODEL),
+                "label": kimi26_wiring.get("label", "unavailable"),
+                "api_key_env": "NVIDIA_KIMI_API_KEY",
+                "api_key_set": kimi_key_set,
+            },
+            "grok": {
+                "name": "Super Heavy Grok",
+                "backend": grok_wiring.get("backend", "offline"),
+                "model": grok_wiring.get("model", XAI_GROK_MODEL),
+                "label": grok_wiring.get("label", "unavailable"),
+                "api_key_env": "XAI_API_KEY",
+                "api_key_set": bool(_grok_svc and _grok_svc.api_key_configured),
+            },
+            "auto": {
+                "name": "Auto",
+                "backend": "router",
+                "model": "auto-switcher",
+                "label": "Auto — Grok / Kimi / Nemotron / Fable-5 / Family by task",
+                "api_key_env": "—",
+                "api_key_set": True,
             },
         },
         "beings": {
             "family_chat": LLM_MODEL_GENERAL,
+            "nemotron_partner": nemo_wiring.get("label", LLM_MODEL_GENERAL),
+            "nemotron_code": nemo_code_wiring.get("label", LLM_MODEL_CODER),
+            "nemoclaw": nemoclaw_wiring.get("label", "unavailable"),
+            "mistral_chat": mistral_wiring.get("label", "unavailable"),
+            "kimi26": kimi26_wiring.get("label", "unavailable"),
+            "kimi27": kimi27_wiring.get("label", "unavailable"),
+            "fable5": f"{fable5_model} (Fable-5)",
+            "grok": grok_wiring.get("label", "unavailable"),
             "being_agent_tools": AGENT_MODEL,
         },
         "features": {
             "review_project": True,
+            "auto_switcher": True,
+            "kimi_swarm": True,
+            "fable5": True,
+            "super_heavy_grok": True,
         },
     }
 
@@ -148,16 +360,29 @@ async def _run_project_review(
         f"{user_message or 'Review this entire project.'}"
     )
     instructor = (instructor or "family").lower()
-    if instructor not in ("family", "claude"):
+    if instructor == "auto":
+        if _kimi_svc and _kimi_svc.is_available:
+            instructor = "kimi27"
+        elif _nemoclaw_svc:
+            instructor = "nemoclaw"
+        else:
+            instructor = "family"
+    if instructor == "kimi":
+        instructor = "kimi26"
+    if instructor not in (
+        "family", "claude", "fable5", "nemotron", "nemoclaw", "mistral",
+        "kimi", "kimi26", "kimi27", "grok",
+    ):
         instructor = "family"
 
     prefix = "PROJECT REVIEW"
+    for_kimi = instructor in ("kimi", "kimi26", "kimi27")
 
     full_context = await build_being_context(
         message=task,
         project_path=project_path,
         compact=True,
-        for_kimi=False,
+        for_kimi=for_kimi,
         for_review=True,
         read_open_file=False,
     )
@@ -170,12 +395,69 @@ async def _run_project_review(
         max_steps,
     )
 
-    result = await run_being_agent(
-        message=task,
-        context=full_context,
-        max_steps=max_steps,
-        scope_root=project_path,
-    )
+    if instructor in ("kimi26", "kimi27", "kimi") and _kimi_svc:
+        from backend.being_agent import run_kimi_agent
+        variant = "k2.7" if instructor == "kimi27" else "k2.6"
+        result = await run_kimi_agent(
+            _kimi_svc,
+            message=task,
+            context=full_context,
+            mode="codelab",
+            max_steps=max_steps,
+            scope_root=project_path,
+            variant=variant,
+        )
+    elif instructor == "nemoclaw" and _nemoclaw_svc:
+        from backend.being_agent import run_nemoclaw_agent
+        result = await run_nemoclaw_agent(
+            _nemoclaw_svc,
+            message=task,
+            context=full_context,
+            max_steps=max_steps,
+            scope_root=project_path,
+        )
+    elif instructor == "nemotron" and _nemo_svc:
+        from backend.being_agent import run_nemo_agent
+        result = await run_nemo_agent(
+            _nemo_svc,
+            message=task,
+            context=full_context,
+            mode="code",
+            max_steps=max_steps,
+            scope_root=project_path,
+        )
+    elif instructor == "mistral" and _mistral_svc:
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(
+            None,
+            lambda: _mistral_svc.generate_content(task, context=full_context),
+        )
+        result = {"text": reply, "tool_count": 0, "tools_executed": []}
+    elif instructor == "grok" and _grok_svc and _grok_svc.is_available:
+        from backend.being_agent import run_being_agent as _run_ba
+        loop = asyncio.get_event_loop()
+
+        async def _grok_gen(prompt: str) -> str:
+            return await loop.run_in_executor(
+                None,
+                lambda: _grok_svc.generate_content(prompt, context=None),
+            )
+
+        result = await _run_ba(
+            _grok_gen,
+            message=task,
+            context=full_context,
+            max_steps=max_steps,
+            scope_root=project_path,
+            review_instructor="grok",
+        )
+    else:
+        result = await run_being_agent(
+            message=task,
+            context=full_context,
+            max_steps=max_steps,
+            scope_root=project_path,
+        )
 
     tool_count = result.get("tool_count", 0)
     text = strip_tool_blocks(result.get("text", ""))
@@ -296,6 +578,420 @@ async def chat_endpoint(request: ChatRequest):
         logger.error(f"Chat error: {e}")
         raise fastapi.HTTPException(status_code=500, detail=str(e))
 
+
+@app.post("/api/nemotron")
+async def nemotron_endpoint(request: NemotronRequest):
+    """Nemotron 3 Ultra — sovereign partner / code mentor."""
+    logger.info("Nemotron request: %s", request.message[:120])
+    if not _nemo_svc:
+        raise fastapi.HTTPException(status_code=503, detail="Nemotron service not available")
+    try:
+        mode = request.mode if request.mode in ("partner", "code") else "partner"
+        from backend.being_agent import (
+            run_nemo_agent,
+            wants_agent_tools,
+            wants_project_review,
+            review_agent_max_steps,
+            strip_tool_blocks,
+            _is_tool_leak,
+            _fallback_summary_from_tools,
+        )
+        from backend.being_context import build_being_context, extract_project_root_path
+
+        is_review = wants_project_review(request.message)
+        project_path = extract_project_root_path(request.message)
+        if is_review:
+            mode = "code"
+
+        full_context = await build_being_context(
+            message=request.message,
+            extra_context=request.context,
+            project_path=project_path,
+            compact=not is_review,
+            ollama_route=not is_review,
+            for_review=is_review,
+            read_open_file=not is_review,
+        )
+
+        if wants_agent_tools(request.message, mode):
+            result = await run_nemo_agent(
+                _nemo_svc,
+                message=request.message,
+                context=full_context,
+                mode=mode,
+                max_steps=review_agent_max_steps() if is_review else 6,
+                scope_root=project_path if is_review else None,
+            )
+            text = strip_tool_blocks(result.get("text", ""))
+            if _is_tool_leak(text) and result.get("tools_executed"):
+                text = _fallback_summary_from_tools(
+                    result["tools_executed"],
+                    user_message=request.message,
+                )
+            tool_count = result.get("tool_count", 0)
+            prefix = f"[NEMOTRON — {tool_count} tool(s) executed]: " if tool_count else "[NEMOTRON]: "
+            wiring = _nemo_svc.wiring_info(mode)
+            return {
+                "response": f"{prefix}{text}",
+                "source": "nemotron",
+                "mode": mode,
+                "model": wiring.get("model"),
+                "wiring": wiring,
+                "tools_executed": result.get("tools_executed", []),
+                "tool_count": tool_count,
+                "agent": True,
+            }
+
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(
+            None,
+            lambda: _nemo_svc.generate_content(
+                request.message, mode=mode, context=full_context
+            ),
+        )
+        wiring = _nemo_svc.wiring_info(mode)
+        return {
+            "response": f"[NEMOTRON]: {reply}",
+            "source": "nemotron",
+            "mode": mode,
+            "model": wiring.get("model"),
+            "wiring": wiring,
+            "agent": False,
+        }
+    except Exception as e:
+        logger.error("Nemotron error: %s", e)
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/nemoclaw")
+async def nemoclaw_endpoint(request: NemoClawRequest):
+    """NemoClaw — NVIDIA agent instructor with full tool loop."""
+    logger.info("NemoClaw request: %s", request.message[:120])
+    if not _nemoclaw_svc:
+        raise fastapi.HTTPException(status_code=503, detail="NemoClaw service not available")
+    try:
+        from backend.being_agent import (
+            run_nemoclaw_agent,
+            wants_project_review,
+            review_agent_max_steps,
+            strip_tool_blocks,
+            _is_tool_leak,
+            _fallback_summary_from_tools,
+        )
+        from backend.being_context import build_being_context, extract_project_root_path
+
+        is_review = wants_project_review(request.message)
+        project_path = extract_project_root_path(request.message)
+
+        full_context = await build_being_context(
+            message=request.message,
+            extra_context=request.context,
+            project_path=project_path,
+            compact=not is_review,
+            for_review=is_review,
+            read_open_file=not is_review,
+        )
+
+        result = await run_nemoclaw_agent(
+            _nemoclaw_svc,
+            message=request.message,
+            context=full_context,
+            max_steps=review_agent_max_steps() if is_review else 6,
+            scope_root=project_path if is_review else None,
+        )
+        text = strip_tool_blocks(result.get("text", ""))
+        if _is_tool_leak(text) and result.get("tools_executed"):
+            text = _fallback_summary_from_tools(
+                result["tools_executed"],
+                user_message=request.message,
+            )
+        tool_count = result.get("tool_count", 0)
+        prefix = f"[NEMOCLAW — {tool_count} tool(s) executed]: " if tool_count else "[NEMOCLAW]: "
+        wiring = _nemoclaw_svc.wiring_info()
+        return {
+            "response": f"{prefix}{text}",
+            "source": "nemoclaw",
+            "model": wiring.get("model"),
+            "wiring": wiring,
+            "tools_executed": result.get("tools_executed", []),
+            "tool_count": tool_count,
+            "agent": True,
+        }
+    except Exception as e:
+        logger.error("NemoClaw error: %s", e)
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/mistral")
+async def mistral_endpoint(request: MistralRequest):
+    """Mistral Medium 3.5 — deep reasoning instructor."""
+    logger.info("Mistral request: %s", request.message[:120])
+    if not _mistral_svc:
+        raise fastapi.HTTPException(status_code=503, detail="Mistral service not available")
+    try:
+        from backend.being_context import build_being_context, extract_project_root_path
+
+        project_path = extract_project_root_path(request.message)
+        full_context = await build_being_context(
+            message=request.message,
+            extra_context=request.context,
+            project_path=project_path,
+            compact=True,
+            read_open_file=True,
+        )
+
+        loop = asyncio.get_event_loop()
+        reply = await loop.run_in_executor(
+            None,
+            lambda: _mistral_svc.generate_content(request.message, context=full_context),
+        )
+        wiring = _mistral_svc.wiring_info()
+        return {
+            "response": f"[MISTRAL]: {reply}",
+            "source": "mistral",
+            "model": wiring.get("model"),
+            "wiring": wiring,
+            "agent": False,
+        }
+    except Exception as e:
+        logger.error("Mistral error: %s", e)
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/kimi")
+async def kimi_endpoint(request: KimiRequest):
+    """Kimi K2.6 / K2.7 — NVIDIA swarm instructor for learning, code, partner decks."""
+    if not _kimi_svc or not _kimi_svc.is_available:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail="Kimi not available — set NVIDIA_KIMI_API_KEY in .env",
+        )
+    try:
+        from backend.being_agent import (
+            run_kimi_agent,
+            wants_agent_tools,
+            wants_project_review,
+            review_agent_max_steps,
+            strip_tool_blocks,
+            _is_tool_leak,
+            _fallback_summary_from_tools,
+        )
+        from backend.being_context import build_being_context, extract_project_root_path
+        from backend.kimi_service import KimiRateLimitError, resolve_kimi_model
+
+        variant_raw = (request.variant or "k2.6").lower().strip()
+        if variant_raw in ("k2.7", "k27", "kimi27"):
+            variant = "k2.7"
+            tag = "KIMI K2.7"
+        else:
+            variant = "k2.6"
+            tag = "KIMI K2.6"
+
+        mode = request.mode if request.mode in (
+            "tutor", "codelab", "learning", "coach", "partner"
+        ) else "tutor"
+
+        is_review = wants_project_review(request.message)
+        project_path = extract_project_root_path(request.message)
+
+        full_context = await build_being_context(
+            message=request.message,
+            extra_context=request.context,
+            project_path=project_path,
+            compact=not is_review,
+            for_kimi=True,
+            for_review=is_review,
+            read_open_file=not is_review,
+        )
+
+        agent_mode = mode
+        if is_review:
+            agent_mode = "codelab"
+        model_id = resolve_kimi_model(variant, request.model)
+        loop = asyncio.get_event_loop()
+
+        if wants_agent_tools(request.message, agent_mode):
+            result = await run_kimi_agent(
+                _kimi_svc,
+                message=request.message,
+                context=full_context,
+                mode=agent_mode,
+                max_steps=review_agent_max_steps() if is_review else 6,
+                domain=request.domain,
+                scope_root=project_path if is_review else None,
+                variant=variant,
+                model=request.model,
+            )
+            text = strip_tool_blocks(result.get("text", ""))
+            if _is_tool_leak(text) and result.get("tools_executed"):
+                text = _fallback_summary_from_tools(
+                    result["tools_executed"],
+                    user_message=request.message,
+                )
+            tool_count = result.get("tool_count", 0)
+            prefix = (
+                f"[{tag} — {tool_count} tool(s) executed on disk]: "
+                if tool_count
+                else f"[{tag}]: "
+            )
+            wiring = _kimi_svc.wiring_info(variant)
+            return {
+                "response": f"{prefix}{text}",
+                "ok": True,
+                "source": "kimi",
+                "variant": variant,
+                "model": model_id,
+                "wiring": wiring,
+                "tools_executed": result.get("tools_executed", []),
+                "tool_count": tool_count,
+                "agent": True,
+                "agent_steps": result.get("agent_steps", 0),
+            }
+
+        result = await loop.run_in_executor(
+            None,
+            lambda: _kimi_svc.interact(
+                message=request.message,
+                mode=agent_mode,
+                context=full_context,
+                domain=request.domain,
+                thinking=False,
+                variant=variant,
+                model=request.model,
+            ),
+        )
+        text = result.get("text", "")
+        wiring = _kimi_svc.wiring_info(variant)
+        return {
+            "response": f"[{tag}]: {text}",
+            "ok": True,
+            "source": "kimi",
+            "variant": variant,
+            "model": result.get("model") or model_id,
+            "wiring": wiring,
+            "agent": False,
+        }
+    except Exception as e:
+        from backend.kimi_service import KimiRateLimitError
+        if isinstance(e, KimiRateLimitError):
+            logger.warning("Kimi rate limit: %s", e)
+            raise fastapi.HTTPException(status_code=429, detail=str(e))
+        logger.error("Kimi error: %s", e)
+        err = str(e)
+        if "429" in err:
+            raise fastapi.HTTPException(
+                status_code=429,
+                detail="NVIDIA rate limit — wait 30–60s. Code Lab agent mode uses multiple calls; use Tutor for chat.",
+            )
+        if "timed out" in err.lower() or "timeout" in err.lower():
+            raise fastapi.HTTPException(
+                status_code=504,
+                detail="Kimi timed out — NVIDIA NIM was slow. Retry in 30s or switch instructor.",
+            )
+        if "500" in err or "server error" in err.lower():
+            raise fastapi.HTTPException(
+                status_code=502,
+                detail="NVIDIA Kimi returned 500. Retry in 30s, smaller scope, or switch to NemoClaw/Mistral.",
+            )
+        raise fastapi.HTTPException(status_code=500, detail=err)
+
+
+@app.post("/api/grok")
+async def grok_endpoint(request: GrokRequest):
+    """Super Heavy Grok — Big Daddy xAI flagship instructor."""
+    logger.info("Super Heavy Grok request: %s", request.message[:120])
+    if not _grok_svc or not _grok_svc.is_available:
+        raise fastapi.HTTPException(
+            status_code=503,
+            detail="Super Heavy Grok offline — set XAI_API_KEY or GROK_API_KEY in .env",
+        )
+    try:
+        from backend.being_agent import (
+            run_being_agent,
+            wants_agent_tools,
+            wants_project_review,
+            review_agent_max_steps,
+            strip_tool_blocks,
+            _is_tool_leak,
+            _fallback_summary_from_tools,
+        )
+        from backend.being_context import (
+            build_being_context,
+            extract_project_root_path,
+            GROK_IDENTITY,
+        )
+
+        is_review = wants_project_review(request.message)
+        project_path = extract_project_root_path(request.message)
+        full_context = await build_being_context(
+            message=request.message,
+            extra_context=request.context,
+            project_path=project_path,
+            compact=not is_review,
+            for_review=is_review,
+            read_open_file=not is_review,
+        )
+        full_context = f"{GROK_IDENTITY}\n\n{full_context}"
+
+        loop = asyncio.get_event_loop()
+
+        async def generate(prompt: str) -> str:
+            return await loop.run_in_executor(
+                None,
+                lambda: _grok_svc.generate_content(prompt, context=None),
+            )
+
+        if wants_agent_tools(request.message, "code") or is_review:
+            result = await run_being_agent(
+                generate,
+                message=request.message,
+                context=full_context,
+                max_steps=review_agent_max_steps() if is_review else 6,
+                scope_root=project_path if is_review else None,
+                review_instructor="grok" if is_review else None,
+            )
+            text = strip_tool_blocks(result.get("text", ""))
+            if _is_tool_leak(text) and result.get("tools_executed"):
+                text = _fallback_summary_from_tools(
+                    result["tools_executed"],
+                    user_message=request.message,
+                )
+            tool_count = result.get("tool_count", 0)
+            prefix = (
+                f"[SUPER HEAVY GROK — {tool_count} tool(s)]: "
+                if tool_count
+                else "[SUPER HEAVY GROK]: "
+            )
+            wiring = _grok_svc.wiring_info()
+            return {
+                "response": f"{prefix}{text}",
+                "source": "grok",
+                "model": wiring.get("model"),
+                "wiring": wiring,
+                "tools_executed": result.get("tools_executed", []),
+                "tool_count": tool_count,
+                "agent": True,
+            }
+
+        reply = await loop.run_in_executor(
+            None,
+            lambda: _grok_svc.generate_content(
+                request.message, context=full_context
+            ),
+        )
+        wiring = _grok_svc.wiring_info()
+        return {
+            "response": f"[SUPER HEAVY GROK]: {reply}",
+            "source": "grok",
+            "model": wiring.get("model"),
+            "wiring": wiring,
+            "agent": False,
+        }
+    except Exception as e:
+        logger.error("Super Heavy Grok error: %s", e)
+        raise fastapi.HTTPException(status_code=500, detail=str(e))
+
+
 # ==========================================
 # AUDIO ROUTE (This makes the kids' TTS work)
 # ==========================================
@@ -304,12 +1000,31 @@ async def synthesize_speech_route(request: fastapi.Request):
     try:
         data = await request.json()
         text = data.get("text", "")
-        voice = data.get("voice") or data.get("being") or "default"
+        # Prefer being pack id (brockston/kimi/nemo) over macOS voice name
+        voice = data.get("being") or data.get("voice") or "default"
 
         speech_svc = SpeechService()
         audio_bytes = await speech_svc.synthesize_speech(text=text, voice_id=voice)
-        
-        return Response(content=audio_bytes, media_type="audio/mpeg")
+        engine = getattr(speech_svc, "last_engine", "unknown")
+        detail = getattr(speech_svc, "last_engine_detail", "")
+        if engine == "macos_say_fallback":
+            logger.warning(
+                "[TTS] Readback used ROBOT FALLBACK (not closed-loop). %s",
+                detail,
+            )
+        # HTTP headers must be latin-1 — strip fancy punctuation
+        def _hdr(s: str) -> str:
+            return (s or "").replace("—", "-").replace("–", "-").encode("ascii", "replace").decode("ascii")[:200]
+
+        return Response(
+            content=audio_bytes,
+            media_type="audio/mpeg",
+            headers={
+                "X-TTS-Engine": _hdr(engine),
+                "X-TTS-Detail": _hdr(detail),
+                "Access-Control-Expose-Headers": "X-TTS-Engine, X-TTS-Detail",
+            },
+        )
     except Exception as e:
         logger.error(f"Speech Synthesis Error: {e}")
         raise fastapi.HTTPException(status_code=500, detail=str(e))
@@ -663,14 +1378,20 @@ async def websocket_viewer(websocket: fastapi.WebSocket):
                     "autocomplete": "qwen2.5-coder:32b (local, autocomplete only)",
                     "family": f"{LLM_MODEL_GENERAL} (local Ollama)",
                     "claude": "claude-sonnet-4 (Anthropic API)",
+                    "nemoclaw": "nvidia/nemotron-3-ultra-550b-a55b (NemoClaw agent)",
+                    "nemotron": "nvidia/nemotron-3-ultra-550b-a55b (NVIDIA NIM)",
+                    "mistral": "mistralai/mistral-medium-3.5-128b (NVIDIA NIM)",
                 },
                 "endpoints": {
                     "family_chat": "/api/chat",
                     "claude_chat": "/api/claude",
+                    "nemoclaw_chat": "/api/nemoclaw",
+                    "nemotron_chat": "/api/nemotron",
+                    "mistral_chat": "/api/mistral",
                     "viewer_ws": "/ws/viewer",
                     "ide_control_ws": "/ws/ide-control"
                 },
-                "note": "Instructors: The Family (local Ollama) and Claude (Anthropic API)."
+                "note": "Instructors: Family, Claude, NemoClaw, Nemotron, Mistral, Auto-switcher."
             }
         }))
     except Exception:

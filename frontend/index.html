@@ -498,18 +498,27 @@
             box-shadow: 0 0 6px var(--tiffany-glow);
         }
 
-        /* Chat messages */
-        .msg.ai {
-            border-left: 3px solid var(--neon-orange);
-        }
-        #ai-panel.claude-mode .msg.ai {
-            border-left-color: var(--tiffany-blue);
-        }
+        /* Chat messages — text + header use --being-color (set per message) */
         .msg .ai-header {
-            color: var(--neon-orange);
+            font-weight: 700;
+            letter-spacing: 0.04em;
         }
-        #ai-panel.claude-mode .msg .ai-header {
-            color: var(--tiffany-blue);
+        .msg .msg-body {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Per-message profile color wins over defaults */
+        .msg.ai {
+            border-left: 3px solid var(--being-color, var(--neon-orange));
+            color: var(--being-color, #fff) !important;
+        }
+        .msg.ai .ai-header,
+        .msg.ai .ai-header i,
+        .msg.ai .msg-body {
+            color: var(--being-color, var(--neon-orange)) !important;
+        }
+        .msg.ai .ai-header {
+            text-shadow: 0 0 6px color-mix(in srgb, var(--being-color, var(--neon-orange)) 45%, transparent);
         }
 
         /* Sidebar icons with accents */
@@ -598,26 +607,28 @@
         }
 
         .msg.ai {
-            color: #fff;
-            background: rgba(255, 95, 31, 0.08);
-            border-left: 3px solid var(--neon-orange);
-            box-shadow: 0 2px 10px rgba(255, 95, 31, 0.05);
+            /* color / border come from --being-color (profile color of the being) */
+            background: color-mix(in srgb, var(--being-color, #FF5F1F) 10%, transparent);
+            border-left: 3px solid var(--being-color, var(--neon-orange));
+            box-shadow: 0 2px 10px color-mix(in srgb, var(--being-color, #FF5F1F) 12%, transparent);
         }
 
         .msg.error {
-            color: #ff4444;
+            color: #ff4444 !important;
             background: rgba(255, 68, 68, 0.1);
             border-left: 3px solid #ff4444;
         }
 
+        .msg.system {
+            color: #888;
+        }
+
         .ai-header {
-            color: var(--neon-orange);
             font-weight: bold;
             display: flex;
             align-items: center;
             gap: 8px;
             margin-bottom: 5px;
-            text-shadow: 0 0 5px rgba(255, 95, 31, 0.4);
         }
 
         .system-tag {
@@ -713,6 +724,74 @@
             background: #0f2a2a !important;
             border-color: var(--tiffany-blue) !important;
         }
+        #inst-nemoclaw { color: #5A8F00 !important; }
+        #inst-nemoclaw.active {
+            background: #0f1a0a !important;
+            border: 1px solid #5A8F00 !important;
+            box-shadow: 0 0 8px rgba(90, 143, 0, 0.35);
+        }
+        #inst-nemotron { color: #40E0D0 !important; }
+        #inst-nemotron.active {
+            background: #0a1a1a !important;
+            border: 1px solid #40E0D0 !important;
+            box-shadow: 0 0 8px rgba(64, 224, 208, 0.35);
+        }
+        #inst-mistral { color: #ff7f4d !important; }
+        #inst-mistral.active {
+            background: #1a1008 !important;
+            border: 1px solid #ff7f4d !important;
+            box-shadow: 0 0 8px rgba(255, 127, 77, 0.35);
+        }
+        /* Kimi = NVIDIA green family (distinct from NemoClaw darker board) */
+        #inst-kimi26 { color: #76B900 !important; font-weight: 700; }
+        #inst-kimi26.active {
+            background: #0f1a00 !important;
+            border: 1px solid #76B900 !important;
+            box-shadow: 0 0 10px rgba(118, 185, 0, 0.5);
+        }
+        #inst-kimi27 { color: #A8E600 !important; font-weight: 700; }
+        #inst-kimi27.active {
+            background: #121a00 !important;
+            border: 1px solid #A8E600 !important;
+            box-shadow: 0 0 10px rgba(168, 230, 0, 0.5);
+        }
+        #inst-fable5 { color: #FFB800 !important; font-weight: 700; }
+        #inst-fable5.active {
+            background: #1a1400 !important;
+            border: 1px solid #FFB800 !important;
+            box-shadow: 0 0 10px rgba(255, 184, 0, 0.45);
+        }
+        #inst-grok { color: #0084FF !important; font-weight: 800; letter-spacing: 0.02em; }
+        #inst-grok.active {
+            background: #001428 !important;
+            border: 1px solid #0084FF !important;
+            box-shadow: 0 0 12px rgba(0, 132, 255, 0.55);
+        }
+        #inst-auto { color: #c9a0ff !important; }
+        #inst-auto.active {
+            background: #120a1a !important;
+            border: 1px solid #c9a0ff !important;
+            box-shadow: 0 0 8px rgba(201, 160, 255, 0.35);
+        }
+        #ai-panel.nemoclaw-mode .msg.ai { border-left-color: #5A8F00; }
+        #ai-panel.nemotron-mode .msg.ai { border-left-color: #40E0D0; }
+        #ai-panel.mistral-mode .msg.ai { border-left-color: #ff7f4d; }
+        #ai-panel.kimi26-mode {
+            border: 1px solid #76B900;
+            box-shadow: inset 0 0 20px rgba(118, 185, 0, 0.1), 0 0 12px rgba(118, 185, 0, 0.2);
+        }
+        #ai-panel.kimi27-mode {
+            border: 1px solid #A8E600;
+            box-shadow: inset 0 0 20px rgba(168, 230, 0, 0.1), 0 0 12px rgba(168, 230, 0, 0.2);
+        }
+        #ai-panel.fable5-mode {
+            border: 1px solid #FFB800;
+            box-shadow: inset 0 0 20px rgba(255, 184, 0, 0.08), 0 0 12px rgba(255, 184, 0, 0.2);
+        }
+        #ai-panel.grok-mode {
+            border: 1px solid #0084FF;
+            box-shadow: inset 0 0 24px rgba(0, 132, 255, 0.12), 0 0 14px rgba(0, 132, 255, 0.3);
+        }
         
         audio { display: none; }
     </style>
@@ -805,12 +884,26 @@
         <div id="ai-panel" class="split">
             <div class="explorer-header" style="padding: 12px 16px 6px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                 <div><i class="fas fa-brain" style="margin-right: 5px;"></i> ASK THE BEINGS</div>
-                <div id="instructor-selector" style="display:flex; gap:2px; font-size:10px; background:#050505; border:1px solid #222; border-radius:4px; padding:2px;">
+                <div id="instructor-selector" style="display:flex; gap:2px; font-size:10px; background:#050505; border:1px solid #222; border-radius:4px; padding:2px; flex-wrap:wrap;">
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('family')" id="inst-family" class="inst-btn" title="The Family — Brockston being + Christman beings" style="padding:3px 10px; background:#111; color:#ccc; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Family</button>
-                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('claude')" id="inst-claude" class="inst-btn" title="Anthropic Claude" style="padding:3px 10px; background:#111; color:#ccc; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Claude</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('claude')" id="inst-claude" class="inst-btn" title="Anthropic Claude" style="padding:3px 10px; background:#111; color:#40E0D0; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Claude</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('fable5')" id="inst-fable5" class="inst-btn" title="Fable-5 — Christman storyteller-educator (Anthropic)" style="padding:3px 10px; background:#111; color:#FFB800; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Fable-5</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('grok')" id="inst-grok" class="inst-btn" title="Super Heavy Grok — Big Daddy xAI flagship" style="padding:3px 10px; background:#111; color:#0084FF; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">GROK</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('nemoclaw')" id="inst-nemoclaw" class="inst-btn" title="NemoClaw — NVIDIA agent on Nemotron 3 Ultra" style="padding:3px 10px; background:#111; color:#5A8F00; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">NemoClaw</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('nemotron')" id="inst-nemotron" class="inst-btn" title="Nemotron 3 Ultra 550B — partner & code mentor" style="padding:3px 10px; background:#111; color:#40E0D0; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Nemotron</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('mistral')" id="inst-mistral" class="inst-btn" title="Mistral Medium 3.5 128B — deep reasoning" style="padding:3px 10px; background:#111; color:#ff7f4d; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Mistral</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('kimi26')" id="inst-kimi26" class="inst-btn" title="Kimi · NVIDIA NIM K2.6 — learning tutor (kids, retention, code)" style="padding:3px 10px; background:#111; color:#76B900; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Kimi 2.6</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('kimi27')" id="inst-kimi27" class="inst-btn" title="Kimi · NVIDIA NIM K2.7 — partner deck swarm + long-horizon coding" style="padding:3px 10px; background:#111; color:#A8E600; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Kimi 2.7</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('auto')" id="inst-auto" class="inst-btn" title="Auto — Grok / Kimi / Nemotron / Fable-5 / Family" style="padding:3px 10px; background:#111; color:#c9a0ff; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Auto</button>
                     <button onclick="showMusicLibrary()" title="Music & Voice MP3 Library — local voice refs + Apple Music links (like a personal streaming lib)" style="padding:3px 8px; background:#1f1f1f; color:var(--copper-light); border:1px solid var(--copper); border-radius:3px; cursor:pointer; font-size:9px;">Lib</button>
                     <button onclick="playMyAlbum()" title="Play your album '53 Years in the Making' — the player, clear as a bell!" style="padding:3px 8px; background:#1f1f1f; color:var(--copper); border:1px solid var(--copper); border-radius:3px; cursor:pointer; font-size:9px; font-weight:700;">▶ Album</button>
                 </div>
+            </div>
+
+            <div id="mode-switcher" style="display:none; padding: 0 14px 6px; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span id="mode-label" style="font-size:10px;color:#666;">Mode:</span>
+                <button onclick="setInstructorMode('partner')" id="mode-partner" class="mode-btn" style="padding:2px 8px; background:#111; color:#888; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Partner</button>
+                <button onclick="setInstructorMode('code')" id="mode-code" class="mode-btn" style="padding:2px 8px; background:#111; color:#888; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Code</button>
             </div>
 
             <div id="review-mode-banner">
@@ -827,10 +920,21 @@
                 <button class="quick-action" onclick="quickAsk('Find bugs or issues in')" style="font-size:10px;background:#111;border:1px solid #222;color:#888;padding:2px 7px;border-radius:3px;cursor:pointer;">Find bugs</button>
                 <button class="quick-action" onclick="quickAsk('Write tests for')" style="font-size:10px;background:#111;border:1px solid #222;color:#888;padding:2px 7px;border-radius:3px;cursor:pointer;">Write tests</button>
                 <button class="quick-action" onclick="setWholeProjectReviewMode(true)" style="font-size:10px;background:#1a1208;border:1px solid var(--neon-orange);color:var(--neon-orange);padding:2px 7px;border-radius:3px;cursor:pointer;" title="Arm whole-project review on explorer folder">Review project</button>
+                <button type="button" id="btn-tool-sheet" onclick="toggleToolCheatSheet()" style="font-size:10px;background:#0a120a;border:1px solid #5A8F00;color:#76B900;padding:2px 7px;border-radius:3px;cursor:pointer;" title="How beings call tools">Tools</button>
+            </div>
+
+            <div id="tool-cheat-sheet" style="display:none; margin:0 14px 8px; padding:10px 12px; background:#0a0c08; border:1px solid #2a3a1a; border-radius:6px; font-family:var(--font-term); font-size:11px; line-height:1.55; color:#b8d89a;">
+                <div style="color:#76B900;font-weight:700;margin-bottom:6px;letter-spacing:0.04em;">BEING TOOLS — how compute runs</div>
+                <div style="color:#888;margin-bottom:6px;">Beings emit this; Studio executes it on disk (Being Eyes):</div>
+                <pre style="margin:0 0 8px; padding:8px; background:#050505; border-radius:4px; color:#A8E600; overflow-x:auto; white-space:pre-wrap;">&lt;tool_call&gt;
+{"tool":"ls","path":".","depth":2}
+&lt;/tool_call&gt;</pre>
+                <div><b style="color:#76B900;">ls</b> · <b style="color:#76B900;">read</b> · <b style="color:#76B900;">patch</b> · <b style="color:#76B900;">write</b> · <b style="color:#76B900;">run</b> · mkdir · move · delete</div>
+                <div style="color:#666;margin-top:6px;">Ask in English: <i>“ls backend depth 2 and read main.py”</i> — NemoClaw / Grok / Kimi / Family run the tools. Real fix = successful tool result, not a claim.</div>
             </div>
 
             <div id="chat-history">
-                <span class="system-tag">[CHRISTMAN FAMILY]: How can we help you love yourself more today? Open a file or just talk to us. <strong>Family</strong> (Brockston being + Christman beings) and <strong>Claude</strong> are in the row above. Your album "53 Years in the Making" (incl. Brockston.mp3) is in the Music Library — hit ▶ Album.</span>
+                <span class="system-tag">[CHRISTMAN FAMILY]: How can we help you love yourself more today? Open a file or talk to us. <strong>Family</strong> · <strong>Claude</strong> · <strong>Fable-5</strong> · <strong>GROK</strong> · <strong>NemoClaw</strong> · <strong>Nemotron</strong> · <strong>Mistral</strong> · <strong>Kimi NIM</strong> · <strong>Auto</strong>. Hit <strong>Tools</strong> above for the tool cheat sheet. ▶ Album ready.</span>
             </div>
             <div id="chat-input-area">
                 <button id="mic-btn" title="Hold or click to speak your question (great for nonverbal)" 
@@ -1354,7 +1458,7 @@
 
         function prepareSpeechText(raw) {
             return String(raw || '')
-                .replace(/\[(?:KIMI REVIEW|KIMI|NEMO|FAMILY|BROCKSTON|CLAUDE|SYSTEM|DEMO|PROJECT REVIEW)[^\]]*\]:?\s*/gi, '')
+                .replace(/\[(?:KIMI REVIEW|KIMI K2\.7|KIMI K2\.6|KIMI|SUPER HEAVY GROK|GROK|FABLE-5|FABLE5|NEMOCLAW|NEMOTRON|NEMO|MISTRAL|FAMILY|BROCKSTON|CLAUDE|SYSTEM|DEMO|PROJECT REVIEW)[^\]]*\]:?\s*/gi, '')
                 .replace(/\{"tool"\s*:[^}]+\}/g, '')
                 .replace(/\[.*?\]/g, '')
                 .replace(/`{1,3}[\s\S]*?`{1,3}/g, ' code block ')
@@ -1383,9 +1487,17 @@
             ttsQueue = ttsQueue.then(async () => {
                 if (!force && !isVoiceModeEnabled) return;
                 try {
-                    const instructor = MODEL_ORCHESTRATOR.getCurrentInstructor();
-                    const key = MODEL_ORCHESTRATOR.currentInstructor || 'brockston';
-                    const ttsBeing = beingOverride || instructor.ttsBeing || (key === 'family' ? 'brockston' : key);
+                    // Resolve instructor key → ttsBeing pack (never pass raw "auto"/"nemoclaw" as WAV id)
+                    let instructorKey = MODEL_ORCHESTRATOR.currentInstructor || 'family';
+                    let instructor = MODEL_ORCHESTRATOR.instructors[instructorKey]
+                        || MODEL_ORCHESTRATOR.getCurrentInstructor();
+                    if (beingOverride && MODEL_ORCHESTRATOR.instructors[beingOverride]) {
+                        instructorKey = beingOverride;
+                        instructor = MODEL_ORCHESTRATOR.instructors[beingOverride];
+                    }
+                    const ttsBeing = instructor.ttsBeing
+                        || (beingOverride && !MODEL_ORCHESTRATOR.instructors[beingOverride] ? beingOverride : null)
+                        || (instructorKey === 'family' || instructorKey === 'auto' ? 'brockston' : instructorKey);
                     const res = await fetch(`${API_BASE}/speech/synthesize`, {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -1395,8 +1507,25 @@
                             voice: instructor.voice || ttsBeing,
                         })
                     });
-                    if (!res.ok) throw new Error('Speech synth failed');
+                    if (!res.ok) {
+                        const errBody = await res.text().catch(() => '');
+                        throw new Error(errBody || 'Speech synth failed');
+                    }
+                    const engine = (res.headers.get('X-TTS-Engine') || '').toLowerCase();
+                    const detail = res.headers.get('X-TTS-Detail') || '';
+                    if (engine.includes('macos_say') || engine.includes('fallback')) {
+                        // Rule 13 — never pretend closed-loop when robot say is speaking
+                        if (!window._ttsRobotWarned) {
+                            window._ttsRobotWarned = true;
+                            appendMessage(
+                                'SYSTEM',
+                                'Voice readback is ROBOT FALLBACK (macOS say) — closed-loop christman_sound XTTS is offline. Need torch+TTS in backend/venv. ' + (detail || ''),
+                                'error'
+                            );
+                        }
+                    }
                     const blob = await res.blob();
+                    if (!blob || blob.size < 64) throw new Error('Empty TTS audio');
                     ttsPlayer.src = URL.createObjectURL(blob);
                     await ttsPlayer.play();
                     await new Promise((resolve) => {
@@ -1405,6 +1534,11 @@
                     });
                 } catch (err) {
                     console.error('TTS error:', err);
+                    appendMessage(
+                        'SYSTEM',
+                        `Voice readback failed: ${err.message}. Closed-loop path: express → christman_sound XTTS → macOS say. Check backend/venv (numpy ok; torch+TTS missing).`,
+                        'error'
+                    );
                 }
             });
             return ttsQueue;
@@ -1476,12 +1610,98 @@
             }
         }
 
+        function toggleToolCheatSheet() {
+            const el = document.getElementById('tool-cheat-sheet');
+            if (!el) return;
+            const open = el.style.display !== 'none' && el.style.display !== '';
+            el.style.display = open ? 'none' : 'block';
+        }
+
         function toggleWholeProjectReview() {
             if (wholeProjectReviewMode) {
                 setWholeProjectReviewMode(false);
             } else {
                 setWholeProjectReviewMode(true);
             }
+        }
+
+        let instructorMode = { nemotron: 'partner', kimi26: 'tutor', kimi27: 'partner' };
+
+        function renderModeSwitcher() {
+            const key = MODEL_ORCHESTRATOR.currentInstructor;
+            const switcher = document.getElementById('mode-switcher');
+            const partnerBtn = document.getElementById('mode-partner');
+            const codeBtn = document.getElementById('mode-code');
+            if (!switcher || !partnerBtn || !codeBtn) return;
+            const color = (MODEL_ORCHESTRATOR.instructors[key] || {}).color || '#40E0D0';
+            if (key === 'nemotron') {
+                switcher.style.display = 'flex';
+                const mode = instructorMode.nemotron || 'partner';
+                partnerBtn.textContent = 'Partner';
+                codeBtn.textContent = 'Code';
+                partnerBtn.style.background = mode === 'partner' ? '#1a1a1a' : '#111';
+                partnerBtn.style.color = mode === 'partner' ? color : '#888';
+                codeBtn.style.background = mode === 'code' ? '#1a1a1a' : '#111';
+                codeBtn.style.color = mode === 'code' ? color : '#888';
+                return;
+            }
+            if (key === 'kimi26' || key === 'kimi27' || key === 'kimi') {
+                switcher.style.display = 'flex';
+                const mode = instructorMode[key] || (key === 'kimi27' ? 'partner' : 'tutor');
+                const isCode = mode === 'codelab' || mode === 'code';
+                partnerBtn.textContent = key === 'kimi27' ? 'Partner deck' : 'Tutor';
+                codeBtn.textContent = 'Code Lab';
+                partnerBtn.style.background = !isCode ? '#1a1a1a' : '#111';
+                partnerBtn.style.color = !isCode ? color : '#888';
+                codeBtn.style.background = isCode ? '#1a1a1a' : '#111';
+                codeBtn.style.color = isCode ? color : '#888';
+                return;
+            }
+            switcher.style.display = 'none';
+        }
+
+        function setInstructorMode(mode) {
+            const key = MODEL_ORCHESTRATOR.currentInstructor;
+            if (key === 'nemotron') {
+                instructorMode.nemotron = mode === 'code' ? 'code' : 'partner';
+                appendMessage('SYSTEM', `Nemotron switched to ${instructorMode.nemotron} mode`, 'system');
+            } else if (key === 'kimi26' || key === 'kimi27' || key === 'kimi') {
+                const next = (mode === 'code' || mode === 'codelab') ? 'codelab'
+                    : (key === 'kimi27' ? 'partner' : 'tutor');
+                instructorMode[key] = next;
+                appendMessage('SYSTEM', `${MODEL_ORCHESTRATOR.instructors[key].name} → ${next} mode`, 'system');
+            }
+            renderModeSwitcher();
+        }
+
+        function detectKimiMode(text, instructorKey) {
+            const m = (text || '').toLowerCase();
+            if (/\b(fix|refactor|patch|bug|implement|code lab|codelab|write tests)\b/.test(m)) return 'codelab';
+            if (/\b(pitch|deck|partner|nvidia|investor|grant|narrative|slide)\b/.test(m)) return 'partner';
+            if (/\b(teach|tutor|kid|child|retention|neuro)\b/.test(m)) return 'tutor';
+            if (instructorKey === 'kimi27') return instructorMode.kimi27 || 'partner';
+            if (instructorKey === 'kimi26' || instructorKey === 'kimi') return instructorMode.kimi26 || 'tutor';
+            return 'tutor';
+        }
+
+        async function postToInstructor(endpoint, body, label, color) {
+            const res = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText || `Server error: ${res.status}`);
+            }
+            const data = await res.json();
+            const profileColor = color
+                || (MODEL_ORCHESTRATOR.getCurrentInstructor() || {}).color
+                || null;
+            appendMessage(label, data.response, 'ai', profileColor);
+            // Speak with the active instructor's ttsBeing (never raw "auto")
+            speakText(data.response, false, MODEL_ORCHESTRATOR.currentInstructor === 'auto' ? null : MODEL_ORCHESTRATOR.currentInstructor);
+            return data;
         }
 
         async function sendChat(extraContext = '') {
@@ -1496,7 +1716,6 @@
 
             if (extraContext) text = extraContext + '\n\n' + text;
 
-            // build rich context for the AI
             let payloadMessage = explorerContextBlock() + text;
             if (activeTabPath) {
                 const tab = findTab(activeTabPath);
@@ -1512,23 +1731,47 @@
 
             appendMessage('YOU', text, 'user');
             chatInput.value = '';
+
+            const resolvedKey = MODEL_ORCHESTRATOR.resolveInstructor(text);
+            const instructor = MODEL_ORCHESTRATOR.instructors[resolvedKey] || MODEL_ORCHESTRATOR.instructors.family;
+            const endpoint = instructor.endpoint;
+
+            if (MODEL_ORCHESTRATOR.currentInstructor === 'auto' && resolvedKey !== 'auto') {
+                appendMessage('SYSTEM', `Auto → ${instructor.name} (${instructor.model})`, 'system');
+            }
+
             try {
-                const instructor = MODEL_ORCHESTRATOR.getCurrentInstructor();
-                const endpoint = instructor.endpoint;
-            
+                const color = instructor.color;
                 if (endpoint === '/api/claude') {
-                    await sendToClaude(payloadMessage, 'CLAUDE');
+                    await sendToClaude(payloadMessage, 'CLAUDE', color);
+                } else if (endpoint === '/api/fable5') {
+                    await sendToFable5(payloadMessage, 'FABLE-5', color);
+                } else if (endpoint === '/api/grok') {
+                    await postToInstructor('/grok', { message: payloadMessage }, 'SUPER HEAVY GROK', color);
+                } else if (endpoint === '/api/nemotron') {
+                    await postToInstructor('/nemotron', {
+                        message: payloadMessage,
+                        mode: instructorMode.nemotron || 'partner',
+                    }, 'NEMOTRON', color);
+                } else if (endpoint === '/api/nemoclaw') {
+                    await postToInstructor('/nemoclaw', { message: payloadMessage }, 'NEMOCLAW', color);
+                } else if (endpoint === '/api/mistral') {
+                    await postToInstructor('/mistral', { message: payloadMessage }, 'MISTRAL', color);
+                } else if (endpoint === '/api/kimi') {
+                    const variant = instructor.variant || (resolvedKey === 'kimi27' ? 'k2.7' : 'k2.6');
+                    const mode = detectKimiMode(text, resolvedKey);
+                    await postToInstructor('/kimi', {
+                        message: payloadMessage,
+                        mode,
+                        variant,
+                    }, instructor.chatLabel || (variant === 'k2.7' ? 'KIMI · NVIDIA 2.7' : 'KIMI · NVIDIA 2.6'), color);
                 } else {
-                    const res = await fetch(`${API_BASE}/chat`, {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({message: payloadMessage})
-                    });
-                    if (!res.ok) throw new Error(`Server error: ${res.status}`);
-                    const data = await res.json();
-                    const who = (data.response || '').includes('ULTIMATE_EV') ? 'ULTIMATE_EV' : 'BROCKSTON';
-                    appendMessage(who, data.response, 'ai');
-                    speakText(data.response);
+                    const data = await postToInstructor('/chat', { message: payloadMessage }, 'BROCKSTON', color);
+                    if ((data.response || '').includes('ULTIMATE_EV')) {
+                        const hist = document.getElementById('chat-history');
+                        const last = hist && hist.lastElementChild;
+                        if (last) last.querySelector('.ai-header')?.replaceChildren(document.createTextNode('ULTIMATE_EV'));
+                    }
                 }
             } catch (err) {
                 console.error(err);
@@ -1550,22 +1793,39 @@
             chatInput.value = '';
             appendMessage('YOU', instruction, 'user');
 
-            const instructor = MODEL_ORCHESTRATOR.getCurrentInstructor();
+            const resolvedKey = MODEL_ORCHESTRATOR.resolveInstructor(instruction);
+            const instructor = MODEL_ORCHESTRATOR.instructors[resolvedKey] || MODEL_ORCHESTRATOR.instructors.family;
             const endpoint = instructor.endpoint;
 
+            const color = instructor.color;
             if (endpoint === '/api/claude') {
-                sendToClaude(prompt, 'CLAUDE');
+                sendToClaude(prompt, 'CLAUDE', color);
+            } else if (endpoint === '/api/fable5') {
+                sendToFable5(prompt, 'FABLE-5', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+            } else if (endpoint === '/api/grok') {
+                postToInstructor('/grok', { message: prompt }, 'SUPER HEAVY GROK', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+            } else if (endpoint === '/api/nemotron') {
+                postToInstructor('/nemotron', { message: prompt, mode: 'code' }, 'NEMOTRON', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+            } else if (endpoint === '/api/nemoclaw') {
+                postToInstructor('/nemoclaw', { message: prompt }, 'NEMOCLAW', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+            } else if (endpoint === '/api/mistral') {
+                postToInstructor('/mistral', { message: prompt }, 'MISTRAL', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+            } else if (endpoint === '/api/kimi') {
+                const variant = instructor.variant || (resolvedKey === 'kimi27' ? 'k2.7' : 'k2.6');
+                postToInstructor('/kimi', {
+                    message: prompt,
+                    mode: 'codelab',
+                    variant,
+                }, instructor.chatLabel || 'KIMI · NVIDIA', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
             } else {
-                // send directly with the constructed rich message
-                fetch(`${API_BASE}/chat`, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({message: prompt})
-                }).then(r => r.json()).then(data => {
-                    const who = (data.response || '').includes('ULTIMATE_EV') ? 'ULTIMATE_EV' : 'BROCKSTON';
-                    appendMessage(who, data.response, 'ai');
-                    speakText(data.response);
-                }).catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
+                postToInstructor('/chat', { message: prompt }, 'BROCKSTON', color)
+                    .catch(e => appendMessage('SYSTEM', '[ERROR] ' + e.message, 'error'));
             }
         }
 
@@ -1579,10 +1839,13 @@
                 appendMessage('SYSTEM', 'Explorer path not ready — wait for files to load or pick a folder.', 'system');
                 return;
             }
-            const instructorKey = MODEL_ORCHESTRATOR.currentInstructor || 'family';
-            const instructor = MODEL_ORCHESTRATOR.getCurrentInstructor();
-            const label = instructor.name || 'BROCKSTON';
             const userLine = extraNotes || 'Review this entire project for architecture, bugs, and Cardinal Rule compliance.';
+            const instructorKey = MODEL_ORCHESTRATOR.resolveInstructor(userLine);
+            const instructor = MODEL_ORCHESTRATOR.instructors[instructorKey] || MODEL_ORCHESTRATOR.instructors.family;
+            const label = instructor.name || 'BROCKSTON';
+            if (MODEL_ORCHESTRATOR.currentInstructor === 'auto') {
+                appendMessage('SYSTEM', `Auto → ${label} for project review`, 'system');
+            }
             const youLine = extraNotes
                 ? `Review project (${root}): ${extraNotes}`
                 : `Review whole project: ${root}`;
@@ -1599,7 +1862,7 @@
                     body: JSON.stringify({
                         path: root,
                         message: userLine,
-                        instructor: instructorKey === 'claude' ? 'family' : instructorKey,
+                        instructor: instructorKey,
                     }),
                 });
                 if (!res.ok) {
@@ -1617,7 +1880,7 @@
                     throw new Error(detail || `Server error: ${res.status}`);
                 }
                 const data = await res.json();
-                appendMessage(label, data.response || '', 'ai');
+                appendMessage(label, data.response || '', 'ai', instructor.color);
                 const speech = extractReviewForSpeech(data.response || '');
                 if (speech) {
                     speakText(speech, true, null);
@@ -1637,21 +1900,53 @@
             }
         }
 
-        async function sendToClaude(text, whoLabel = 'CLAUDE') {
+        async function sendToClaude(text, whoLabel = 'CLAUDE', color = null) {
             try {
                 const messages = [{ role: "user", content: text }];
                 const res = await fetch(`${API_BASE}/claude`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ messages, system: "" })
+                    body: JSON.stringify({ messages, system: "", persona: "claude" })
                 });
                 if (!res.ok) throw new Error(`Server error: ${res.status}`);
                 const data = await res.json();
-                appendMessage(whoLabel, data.content || '', 'ai');
-                speakText(data.content);
+                const profileColor = color
+                    || (MODEL_ORCHESTRATOR.instructors.claude || {}).color
+                    || '#40E0D0';
+                appendMessage(whoLabel, data.content || data.response || '', 'ai', profileColor);
+                speakText(data.content || data.response || '', null, 'claude');
             } catch (err) {
                 console.error(err);
                 appendMessage('SYSTEM', `[CLAUDE ERROR]: ${err.message}`, 'error');
+            }
+        }
+
+        async function sendToFable5(text, whoLabel = 'FABLE-5', color = null) {
+            try {
+                const messages = [{ role: "user", content: text }];
+                const res = await fetch(`${API_BASE}/fable5`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        messages,
+                        system: "",
+                        persona: "fable5",
+                        model: "fable-5",
+                    })
+                });
+                if (!res.ok) {
+                    const errText = await res.text();
+                    throw new Error(errText || `Server error: ${res.status}`);
+                }
+                const data = await res.json();
+                const profileColor = color
+                    || (MODEL_ORCHESTRATOR.instructors.fable5 || {}).color
+                    || '#FFB800';
+                appendMessage(whoLabel, data.content || data.response || '', 'ai', profileColor);
+                speakText(data.content || data.response || '', null, 'fable5');
+            } catch (err) {
+                console.error(err);
+                appendMessage('SYSTEM', `[FABLE-5 ERROR]: ${err.message}`, 'error');
             }
         }
 
@@ -1664,7 +1959,10 @@
                 });
                 if (!res.ok) throw new Error(`Server error: ${res.status}`);
                 const data = await res.json();
-                appendMessage(whoLabel, data.response || '', 'ai');
+                const glmColor = (MODEL_ORCHESTRATOR.instructors.glm || {}).color
+                    || (MODEL_ORCHESTRATOR.getCurrentInstructor() || {}).color
+                    || '#c9a0ff';
+                appendMessage(whoLabel, data.response || '', 'ai', glmColor);
                 speakText(data.response);
             } catch (err) {
                 console.error(err);
@@ -1672,13 +1970,41 @@
             }
         }
 
-        function appendMessage(sender, text, type) {
+        function appendMessage(sender, text, type, profileColor) {
             const div = document.createElement('div');
             div.className = `msg ${type}`;
             let icon = 'fa-user';
             if (type === 'ai')     icon = 'fa-robot';
             if (type === 'system' || type === 'error') icon = 'fa-server';
-            div.innerHTML = `<div class="ai-header"><i class="fas ${icon}"></i> ${sender}</div> ${escapeHtml(text)}`;
+
+            // Chat text must match the being's profile color exactly
+            let color = profileColor || null;
+            if (!color && type === 'ai') {
+                const inst = MODEL_ORCHESTRATOR.getCurrentInstructor() || {};
+                color = inst.color || '#FF5F1F';
+            }
+            if (type === 'system' && !color) color = '#888';
+            if (type === 'error') color = '#ff4444';
+            if (type === 'user') color = '#fff';
+
+            if (color) {
+                div.style.setProperty('--being-color', color);
+                div.style.setProperty('color', color, 'important');
+                if (type === 'ai' || (type === 'system' && profileColor)) {
+                    div.style.setProperty('border-left-color', color, 'important');
+                    if (type === 'system' && profileColor) {
+                        // tint system switch lines like the being
+                        div.classList.add('ai');
+                    }
+                }
+            }
+
+            const colorAttr = color ? ` style="color:${color} !important"` : '';
+            div.innerHTML =
+                `<div class="ai-header"${colorAttr}>` +
+                `<i class="fas ${icon}"${colorAttr}></i> ${escapeHtml(sender)}` +
+                `</div>` +
+                `<div class="msg-body"${colorAttr}>${escapeHtml(text)}</div>`;
             chatHistory.appendChild(div);
             chatHistory.scrollTop = chatHistory.scrollHeight;
         }
@@ -2346,20 +2672,112 @@
                     voice: 'Daniel',
                     ttsBeing: 'brockston',
                     description: 'Anthropic Claude — carbon-silicon partner'
+                },
+                'fable5': {
+                    name: 'Fable-5',
+                    model: 'Fable-5 · Anthropic',
+                    endpoint: '/api/fable5',
+                    color: '#FFB800',
+                    voice: 'Daniel',
+                    ttsBeing: 'brockston',
+                    chatLabel: 'FABLE-5',
+                    description: 'Fable-5 — Christman storyteller-educator on Anthropic'
+                },
+                'grok': {
+                    name: 'Super Heavy Grok',
+                    model: 'grok-4.5 (xAI Super Heavy)',
+                    endpoint: '/api/grok',
+                    color: '#0084FF',
+                    voice: 'Daniel',
+                    ttsBeing: 'ultimateev',
+                    chatLabel: 'SUPER HEAVY GROK',
+                    description: 'Big Daddy Super Heavy Grok — xAI flagship, max horsepower'
+                },
+                'nemoclaw': {
+                    name: 'NemoClaw',
+                    model: 'nvidia/nemotron-3-ultra-550b-a55b (agent)',
+                    endpoint: '/api/nemoclaw',
+                    color: '#5A8F00',
+                    voice: 'Fred',
+                    ttsBeing: 'nemo',
+                    description: 'NVIDIA NemoClaw agent — Nemotron 3 Ultra with full tool loop'
+                },
+                'nemotron': {
+                    name: 'Nemotron',
+                    model: 'nvidia/nemotron-3-ultra-550b-a55b (NVIDIA NIM)',
+                    endpoint: '/api/nemotron',
+                    color: '#40E0D0',
+                    voice: 'Fred',
+                    ttsBeing: 'nemo',
+                    description: 'Nemotron 3 Ultra — sovereign partner and code mentor'
+                },
+                'mistral': {
+                    name: 'Mistral',
+                    model: 'mistralai/mistral-medium-3.5-128b (NVIDIA NIM)',
+                    endpoint: '/api/mistral',
+                    color: '#ff7f4d',
+                    voice: 'Daniel',
+                    ttsBeing: 'brockston',
+                    description: 'Mistral Medium 3.5 — deep reasoning and architecture'
+                },
+                'kimi26': {
+                    name: 'Kimi · NVIDIA K2.6',
+                    model: 'moonshotai/kimi-k2.6 (NVIDIA NIM)',
+                    endpoint: '/api/kimi',
+                    color: '#76B900',
+                    voice: 'Alex',
+                    ttsBeing: 'kimi',
+                    variant: 'k2.6',
+                    chatLabel: 'KIMI · NVIDIA 2.6',
+                    description: 'Kimi on NVIDIA NIM K2.6 — tutor, retention, kids, code lab'
+                },
+                'kimi27': {
+                    name: 'Kimi · NVIDIA K2.7',
+                    model: 'moonshotai/kimi-k2.7 (NVIDIA NIM)',
+                    endpoint: '/api/kimi',
+                    color: '#A8E600',
+                    voice: 'Alex',
+                    ttsBeing: 'kimi',
+                    variant: 'k2.7',
+                    chatLabel: 'KIMI · NVIDIA 2.7',
+                    description: 'Kimi on NVIDIA NIM K2.7 — partner deck swarm + long-horizon coding'
+                },
+                'kimi': {
+                    name: 'Kimi · NVIDIA K2.6',
+                    model: 'moonshotai/kimi-k2.6 (NVIDIA NIM)',
+                    endpoint: '/api/kimi',
+                    color: '#76B900',
+                    voice: 'Alex',
+                    ttsBeing: 'kimi',
+                    variant: 'k2.6',
+                    chatLabel: 'KIMI · NVIDIA 2.6',
+                    description: 'Alias for Kimi · NVIDIA K2.6'
+                },
+                'auto': {
+                    name: 'Auto',
+                    model: 'auto-switcher',
+                    endpoint: '/api/chat',
+                    color: '#c9a0ff',
+                    voice: 'Daniel',
+                    ttsBeing: 'brockston',
+                    description: 'Picks Super Heavy Grok / Kimi / Nemotron / Fable-5 / Family by task'
                 }
             },
 
-            currentInstructor: 'family',
+            currentInstructor: 'auto',
+            _healthInstructors: {},
 
             syncFromHealth: async function() {
                 try {
                     const h = await fetch(`${API_BASE}/health`).then(r => r.json());
                     const map = h.instructors || {};
+                    this._healthInstructors = map;
                     for (const key of Object.keys(this.instructors)) {
                         const live = map[key];
                         if (live && live.label) {
                             this.instructors[key].model = live.label;
                             this.instructors[key].backend = live.backend;
+                            this.instructors[key].api_key_set = live.api_key_set;
                         }
                     }
                     this.setInstructor(this.currentInstructor, { announce: false });
@@ -2368,56 +2786,135 @@
                 }
             },
 
+            _isAvailable: function(key) {
+                const live = this._healthInstructors[key];
+                if (!live) return key === 'family' || key === 'auto';
+                if (live.backend === 'offline') return false;
+                if (live.api_key_set === false && live.backend === 'nvidia') return false;
+                // proxy backend counts as available when key missing but local proxy up
+                return true;
+            },
+
+            autoRoute: function(message) {
+                const m = (message || '').toLowerCase();
+                const hasFile = !!activeTabPath;
+
+                // Big Daddy Super Heavy Grok when called by name or max-power asks
+                if (/\b(super\s*heavy|big\s*daddy|grok|xai|maximum\s*horsepower)\b/.test(m)) {
+                    if (this._isAvailable('grok')) return 'grok';
+                }
+                // Fable-5 storyteller / narrative
+                if (/\b(fable-?5|fable5|storytell|story\s*time|narrative\s*arc|tell\s*(the\s*)?story)\b/.test(m)) {
+                    if (this._isAvailable('fable5')) return 'fable5';
+                }
+                // NVIDIA partner deck / pitch → Kimi NIM 2.7 + Grok swarm
+                if (/\b(pitch|partner\s*deck|nvidia\s*(deck|partner|pitch|nim)|investor|grant\s*narrative|slide\s*deck|fundraising)\b/.test(m)) {
+                    if (this._isAvailable('kimi27')) return 'kimi27';
+                    if (this._isAvailable('grok')) return 'grok';
+                    if (this._isAvailable('kimi26')) return 'kimi26';
+                    if (this._isAvailable('mistral')) return 'mistral';
+                }
+                if (/\b(review project|whole project|scan project|audit repo)\b/.test(m)) {
+                    if (this._isAvailable('grok')) return 'grok';
+                    if (this._isAvailable('kimi27')) return 'kimi27';
+                    if (this._isAvailable('nemoclaw')) return 'nemoclaw';
+                    if (this._isAvailable('nemotron')) return 'nemotron';
+                }
+                if (/\b(fix|refactor|patch|bug|implement|write tests|run command|execute|ls |read |patch )\b/.test(m) || hasFile) {
+                    if (this._isAvailable('grok')) return 'grok';
+                    if (this._isAvailable('nemoclaw')) return 'nemoclaw';
+                    if (this._isAvailable('kimi26')) return 'kimi26';
+                    if (this._isAvailable('nemotron')) return 'nemotron';
+                }
+                if (/\b(architect|architecture|design|compare|trade.?off|strategy|why should|plan|reason)\b/.test(m)) {
+                    if (this._isAvailable('mistral')) return 'mistral';
+                    if (this._isAvailable('grok')) return 'grok';
+                    if (this._isAvailable('kimi27')) return 'kimi27';
+                }
+                if (/\b(teach|tutor|learn|student|kid|child|nonverbal|retention|neuro)\b/.test(m)) {
+                    if (this._isAvailable('kimi26')) return 'kimi26';
+                    if (this._isAvailable('fable5')) return 'fable5';
+                    return 'family';
+                }
+                if (this._isAvailable('grok')) return 'grok';
+                if (this._isAvailable('kimi27')) return 'kimi27';
+                if (this._isAvailable('nemoclaw')) return 'nemoclaw';
+                if (this._isAvailable('mistral')) return 'mistral';
+                if (this._isAvailable('nemotron')) return 'nemotron';
+                if (this._isAvailable('kimi26')) return 'kimi26';
+                if (this._isAvailable('fable5')) return 'fable5';
+                return 'family';
+            },
+
+            resolveInstructor: function(message) {
+                if (this.currentInstructor !== 'auto') return this.currentInstructor;
+                return this.autoRoute(message);
+            },
+
             setInstructor: function(instructorKey, opts = {}) {
                 const announce = opts.announce !== false;
                 const instructor = this.instructors[instructorKey] || this.instructors['family'];
                 this.currentInstructor = instructorKey;
-                
-                // Update status bar
+
                 const instLabel = document.getElementById('sb-inst-name');
                 if (instLabel) {
                     instLabel.textContent = instructor.name;
                     instLabel.style.color = instructor.color;
                 }
-                
-                // Update model display
+
                 const modelLabel = document.getElementById('sb-model-name');
                 if (modelLabel) {
                     modelLabel.textContent = instructor.model;
                     modelLabel.style.color = instructor.color;
                 }
-                
-                // Update chat input placeholder
+
                 const input = document.getElementById('chat-input');
                 if (input) {
-                    input.placeholder = `Ask ${instructor.name} (${instructor.model})...`;
+                    input.placeholder = instructorKey === 'auto'
+                        ? 'Ask anything — Auto picks Grok / Kimi NIM / Nemotron / Fable-5...'
+                        : `Ask ${instructor.name} (${instructor.model})...`;
                 }
-                
-                // Update active button states
+
                 document.querySelectorAll('#instructor-selector .inst-btn').forEach(b => b.classList.remove('active'));
                 const activeBtn = document.getElementById('inst-' + instructorKey);
                 if (activeBtn) activeBtn.classList.add('active');
-                
-                // Visual mode on the panel for special instructors
+
                 const aiPanel = document.getElementById('ai-panel');
                 if (aiPanel) {
-                    aiPanel.classList.remove('claude-mode');
-                    if (instructorKey === 'claude') {
-                        aiPanel.classList.add('claude-mode');
-                    }
+                    aiPanel.classList.remove(
+                        'claude-mode', 'nemoclaw-mode', 'nemotron-mode', 'mistral-mode',
+                        'kimi-mode', 'kimi26-mode', 'kimi27-mode', 'fable5-mode', 'grok-mode'
+                    );
+                    if (instructorKey === 'claude') aiPanel.classList.add('claude-mode');
+                    if (instructorKey === 'nemoclaw') aiPanel.classList.add('nemoclaw-mode');
+                    if (instructorKey === 'nemotron') aiPanel.classList.add('nemotron-mode');
+                    if (instructorKey === 'mistral') aiPanel.classList.add('mistral-mode');
+                    if (instructorKey === 'kimi26' || instructorKey === 'kimi') aiPanel.classList.add('kimi26-mode');
+                    if (instructorKey === 'kimi27') aiPanel.classList.add('kimi27-mode');
+                    if (instructorKey === 'fable5') aiPanel.classList.add('fable5-mode');
+                    if (instructorKey === 'grok') aiPanel.classList.add('grok-mode');
                 }
-                
-                // Broadcast to viewer
+
+                if (instructorKey === 'nemotron' && (instructorMode.nemotron !== 'code' && instructorMode.nemotron !== 'partner')) {
+                    instructorMode.nemotron = 'partner';
+                }
+
                 broadcastToViewer('instructor_changed', {
                     instructor: instructorKey,
                     model: instructor.model,
                     endpoint: instructor.endpoint
                 });
-                
+
                 if (announce) {
-                    appendMessage('SYSTEM', `Switched to ${instructor.name} — ${instructor.model}. ${instructor.description}`, 'system');
+                    appendMessage(
+                        instructor.name.toUpperCase(),
+                        `Switched to ${instructor.name} — ${instructor.model}. ${instructor.description}`,
+                        'ai',
+                        instructor.color
+                    );
                 }
 
+                renderModeSwitcher();
                 return instructor;
             },
 
@@ -2436,9 +2933,9 @@
             }
         };
 
-        // Initialize orchestrator — sync live model labels from /api/health, then apply instructor
         MODEL_ORCHESTRATOR.syncFromHealth().finally(() => {
-            MODEL_ORCHESTRATOR.setInstructor(MODEL_ORCHESTRATOR.currentInstructor || 'family');
+            MODEL_ORCHESTRATOR.setInstructor(MODEL_ORCHESTRATOR.currentInstructor || 'auto');
+            renderModeSwitcher();
         });
 
         // Wrap existing event handlers to also broadcast to viewer

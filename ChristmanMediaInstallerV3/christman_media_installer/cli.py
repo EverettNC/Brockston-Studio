@@ -30,6 +30,7 @@ from .targets import get_profile, list_beings
 from .explorer import Explorer
 from .detector import Detector
 from .shim_engine import ShimEngine
+from .isolation_vault import IsolationVault, VAULT_DIRNAME
 from .repair_packet import RepairPacketBuilder, save_packet
 from .installer import Installer
 from .verifier import Verifier
@@ -81,6 +82,8 @@ def cmd_explore(args: argparse.Namespace) -> int:
     print(f"  Microphone refs:       {len(report.microphone_refs)}")
     print(f"  Phoneme refs:          {len(report.phoneme_refs)}")
     print(f"  XTTS refs:             {len(report.xtts_refs)}")
+    print(f"  Ear canal refs:        {len(report.ear_canal_refs)}")
+    print(f"  Voice SDK refs:        {len(report.voice_sdk_refs)}")
     print(f"  .env files:            {len(report.env_files)}")
 
     if report.broken_imports:
@@ -124,13 +127,20 @@ def cmd_install(args: argparse.Namespace) -> int:
     detector = Detector(args.target, explore_report)
     detect_result = detector.detect()
 
+    # Isolation vault — the pathway's memory for this session
+    vault = IsolationVault(args.target, dry_run=args.dry_run)
+
     # Install
+    installer = None
     if profile:
-        installer = Installer(args.target, profile, dry_run=args.dry_run)
+        installer = Installer(args.target, profile, dry_run=args.dry_run, vault=vault)
         installer.install()
 
     # Shims
-    shim_engine = ShimEngine(args.target, dry_run=args.dry_run)
+    shim_engine = ShimEngine(
+        args.target, dry_run=args.dry_run,
+        vault=vault, displace=getattr(args, "displace", False),
+    )
     shim_results = shim_engine.install_shims(explore_report)
 
     # Repair packet
@@ -161,6 +171,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         verifier=verify_report,
         security=sec_report,
         repair_packet=packet,
+        isolation=vault.session_summary(),
     )
     truth.print()
 
@@ -191,7 +202,11 @@ def cmd_repair(args: argparse.Namespace) -> int:
     detector = Detector(args.target, explore_report)
     detect_result = detector.detect()
 
-    shim_engine = ShimEngine(args.target, dry_run=args.dry_run)
+    vault = IsolationVault(args.target, dry_run=args.dry_run)
+    shim_engine = ShimEngine(
+        args.target, dry_run=args.dry_run,
+        vault=vault, displace=getattr(args, "displace", False),
+    )
     shim_results = shim_engine.install_shims(explore_report)
 
     packet_builder = RepairPacketBuilder(being_name, args.target, detect_result)
@@ -201,6 +216,13 @@ def cmd_repair(args: argparse.Namespace) -> int:
     print(f"\n📦 Repair complete.")
     print(f"   Shims installed: {shim_engine.shim_count}")
     print(f"   Shims skipped:   {shim_engine.skip_count}")
+    summary = vault.session_summary()
+    if summary["disengaged"]:
+        print(f"   Disengaged → {VAULT_DIRNAME}/{vault.session_id}:")
+        for r in summary["disengaged"]:
+            print(f"     📦 {r['original_path']}  (sha256 {r['sha256'][:12]}…)")
+    if summary["unlocked"]:
+        print(f"   Unlocked: {len(summary['unlocked'])} capability record(s) ledgered")
 
     if args.save_packet:
         save_packet(packet, args.save_packet)
@@ -211,6 +233,25 @@ def cmd_repair(args: argparse.Namespace) -> int:
         for w in hidden:
             print(f"   {w}")
 
+    return 0
+
+
+# ──────────────────────────────────────────────
+# COMMAND: restore
+# ──────────────────────────────────────────────
+def cmd_restore(args: argparse.Namespace) -> int:
+    _configure_logging(args.verbose)
+    _print_banner()
+    print(f"↩️  RESTORING session {args.session} in: {args.target}\n")
+    try:
+        vault = IsolationVault(args.target, dry_run=args.dry_run)
+        restored = vault.restore_session(args.session)
+    except (FileNotFoundError, FileExistsError, ValueError, RuntimeError) as e:
+        print(f"❌ Restore halted: {e}")
+        return 1
+    print(f"✅ Restored {len(restored)} file(s). Every hash verified against the ledger.")
+    for r in restored:
+        print(f"   ↩️  {r.original_path}")
     return 0
 
 
@@ -314,18 +355,30 @@ def main() -> int:
     p_install = subparsers.add_parser("install", help="Install full media stack for a being")
     add_common(p_install)
     p_install.add_argument("--save-packet", default=None, help="Path to save repair packet JSON")
+    p_install.add_argument("--displace", action="store_true",
+                           help="Explicitly approve moving real-logic files into "
+                                "CHRISTMAN_ISOLATION when a shim must take their place")
     p_install.set_defaults(func=cmd_install)
 
     # repair
     p_repair = subparsers.add_parser("repair", help="Apply shims and repair broken imports")
     add_common(p_repair)
     p_repair.add_argument("--save-packet", default=None, help="Path to save repair packet JSON")
+    p_repair.add_argument("--displace", action="store_true",
+                          help="Explicitly approve moving real-logic files into "
+                               "CHRISTMAN_ISOLATION when a shim must take their place")
     p_repair.set_defaults(func=cmd_repair)
 
     # verify
     p_verify = subparsers.add_parser("verify", help="Run smoke tests and verifications")
     add_common(p_verify)
     p_verify.set_defaults(func=cmd_verify)
+
+    # restore
+    p_restore = subparsers.add_parser("restore", help="Return vaulted files from a session to their original paths")
+    add_common(p_restore)
+    p_restore.add_argument("--session", required=True, help="Session ID (folder name under CHRISTMAN_ISOLATION)")
+    p_restore.set_defaults(func=cmd_restore)
 
     # report
     p_report = subparsers.add_parser("report", help="Generate full truth report")
