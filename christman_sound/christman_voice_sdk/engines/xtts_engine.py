@@ -112,7 +112,12 @@ class XTTSEngine(BaseSynthesizer):
         duration = audio.shape[1] / sr
 
         if duration < 3.0:
-            logger.warning(f"Reference audio is only {duration:.1f}s. Recommend 6+ seconds for best quality.")
+            # Short clips still usable — MUST set speaker_wav (was a silent no-op bug)
+            logger.warning(
+                f"Reference audio is only {duration:.1f}s. Recommend 6+ seconds for best quality. "
+                "Using full clip as-is."
+            )
+            self.speaker_wav = str(reference_audio)
         elif duration > 30.0:
             logger.warning(f"Reference audio is {duration:.1f}s. Recommend 6-15 seconds. Will use first 15s.")
             # Trim to 15 seconds
@@ -124,13 +129,13 @@ class XTTSEngine(BaseSynthesizer):
                 temp_path = Path(f.name)
                 torchaudio.save(str(temp_path), audio, sr)
                 self.speaker_wav = str(temp_path)
-        else:
-            self.speaker_wav = str(reference_audio)
-
-        if self.speaker_wav != str(reference_audio):
             logger.info(f"Using trimmed audio: {duration:.1f}s → 15.0s")
         else:
+            self.speaker_wav = str(reference_audio)
             logger.info(f"Loaded voice from {reference_audio.name} ({duration:.1f}s)")
+
+        if not self.speaker_wav:
+            raise ValueError(f"load_voice failed to set speaker_wav for {reference_audio}")
 
     def synthesize(
         self,

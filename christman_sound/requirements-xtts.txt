@@ -1,0 +1,18 @@
+# Brockston-Studio / christman_sound — closed-loop XTTS env (Python 3.11 only)
+# Create:
+#   python3.11 -m venv christman_sound/.venv_py311
+#   .venv_py311/bin/pip install -r requirements-xtts.txt
+#
+# Coqui TTS needs Python >=3.9,<3.12. Do not use 3.12/3.13 for this env.
+
+numpy>=1.22,<2
+torch==2.2.2
+torchaudio==2.2.2
+scipy
+soundfile
+llvmlite==0.41.1
+numba==0.58.1
+TTS==0.22.0
+transformers==4.36.2
+huggingface-hub>=0.16,<0.21
+tokenizers<0.16

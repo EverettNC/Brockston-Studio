@@ -1,3 +1,11 @@
+"""
+LEGACY — gTTS Flask demo. NOT closed-loop christman_sound.
+
+Do not use for beings, SPEAK, or Studio readback.
+Live path: engines/xtts_engine.py, shorty_voice_engine_v3.py,
+           voice_synthesis_orchestrator.py
+"""
+
 import hashlib
 import logging
 import os

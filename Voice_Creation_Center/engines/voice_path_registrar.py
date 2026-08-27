@@ -290,19 +290,45 @@ def register_single_file(
         logger.error(f"WAV file not found: {wav_path}")
         return {"success": False, "error": f"File not found: {wav_path}"}
 
+    # Harvest pack filenames have been observed not matching spoken audio.
+    # Live Studio may export approved takes there later; until a take is
+    # validated, do not index those files as AlphaVox's mouth.
+    if "alphavox_cycled" in wav.parts and "alphavox_verified" not in wav.parts:
+        logger.error("Refuse to register unvalidated harvest pack file: %s", wav)
+        return {
+            "success": False,
+            "registered": False,
+            "error": "Refuse alphavox_cycled harvest pack. Register a validated/verified WAV.",
+        }
+
     index = _load_index()
     existing_ids = {p["phrase_id"] for p in index.get("phrases", [])}
 
     phrase_id = _make_phrase_id(text, being_name, language)
 
     if phrase_id in existing_ids:
-        logger.info(f"Phrase already registered: '{text}' for {being_name}")
-        return {
-            "success": True,
-            "registered": False,
-            "message": "Already registered.",
-            "phrase_id": phrase_id
-        }
+        new_path = str(wav.absolute())
+        for phrase in index.get("phrases", []):
+            if phrase.get("phrase_id") != phrase_id:
+                continue
+            if phrase.get("audio_path") == new_path:
+                logger.info(f"Phrase already registered: '{text}' for {being_name}")
+                return {
+                    "success": True,
+                    "registered": False,
+                    "message": "Already registered.",
+                    "phrase_id": phrase_id
+                }
+            phrase["audio_path"] = new_path
+            phrase["original_filename"] = wav.name
+            _save_index(index)
+            logger.info("Updated express path for '%s' → %s", text, wav.name)
+            return {
+                "success": True,
+                "registered": True,
+                "updated": True,
+                "phrase_id": phrase_id,
+            }
 
     duration    = _get_wav_duration(wav)
     sample_rate = _get_wav_sample_rate(wav)

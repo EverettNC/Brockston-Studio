@@ -891,7 +891,7 @@
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('grok')" id="inst-grok" class="inst-btn" title="Super Heavy Grok — Big Daddy xAI flagship" style="padding:3px 10px; background:#111; color:#0084FF; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">GROK</button>
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('nemoclaw')" id="inst-nemoclaw" class="inst-btn" title="NemoClaw — NVIDIA agent on Nemotron 3 Ultra" style="padding:3px 10px; background:#111; color:#5A8F00; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">NemoClaw</button>
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('nemotron')" id="inst-nemotron" class="inst-btn" title="Nemotron 3 Ultra 550B — partner & code mentor" style="padding:3px 10px; background:#111; color:#40E0D0; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Nemotron</button>
-                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('mistral')" id="inst-mistral" class="inst-btn" title="Mistral Medium 3.5 128B — deep reasoning" style="padding:3px 10px; background:#111; color:#ff7f4d; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Mistral</button>
+                    <button onclick="MODEL_ORCHESTRATOR.setInstructor('mistral')" id="inst-mistral" class="inst-btn" title="Mistral-Nemotron (NVIDIA NIM) — deep reasoning" style="padding:3px 10px; background:#111; color:#ff7f4d; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Mistral-Nemotron</button>
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('kimi26')" id="inst-kimi26" class="inst-btn" title="Kimi · NVIDIA NIM K2.6 — learning tutor (kids, retention, code)" style="padding:3px 10px; background:#111; color:#76B900; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Kimi 2.6</button>
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('kimi27')" id="inst-kimi27" class="inst-btn" title="Kimi · NVIDIA NIM K2.7 — partner deck swarm + long-horizon coding" style="padding:3px 10px; background:#111; color:#A8E600; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Kimi 2.7</button>
                     <button onclick="MODEL_ORCHESTRATOR.setInstructor('auto')" id="inst-auto" class="inst-btn" title="Auto — Grok / Kimi / Nemotron / Fable-5 / Family" style="padding:3px 10px; background:#111; color:#c9a0ff; border:none; border-radius:3px; cursor:pointer; font-family:var(--font-term);">Auto</button>
@@ -1536,7 +1536,7 @@
                     console.error('TTS error:', err);
                     appendMessage(
                         'SYSTEM',
-                        `Voice readback failed: ${err.message}. Closed-loop path: express → christman_sound XTTS → macOS say. Check backend/venv (numpy ok; torch+TTS missing).`,
+                        `Voice readback failed: ${err.message}. Closed-loop path: warm XTTS :8766 → worker. Apple say is blocked (CHRISTMAN_ALLOW_ROBOT_TTS=0). If this persists, check logs/xtts_server.log and that Voice mode is on.`,
                         'error'
                     );
                 }
@@ -2712,13 +2712,13 @@
                     description: 'Nemotron 3 Ultra — sovereign partner and code mentor'
                 },
                 'mistral': {
-                    name: 'Mistral',
-                    model: 'mistralai/mistral-medium-3.5-128b (NVIDIA NIM)',
+                    name: 'Mistral-Nemotron',
+                    model: 'mistralai/mistral-nemotron (NVIDIA NIM)',
                     endpoint: '/api/mistral',
                     color: '#ff7f4d',
-                    voice: 'Daniel',
-                    ttsBeing: 'brockston',
-                    description: 'Mistral Medium 3.5 — deep reasoning and architecture'
+                    voice: 'Fred',
+                    ttsBeing: 'nemo',
+                    description: 'Mistral-Nemotron — deep reasoning (voice: Nemo pack)'
                 },
                 'kimi26': {
                     name: 'Kimi · NVIDIA K2.6',

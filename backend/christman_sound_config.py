@@ -54,10 +54,16 @@ TTS_BEING_ALIASES: dict[str, str] = {
     "fable-5": "brockston",
     "auto": "brockston",
     "default": "brockston",
-    # NVIDIA swarm → Nemo pack when present, else brockston fallback in find_reference_wav
+    # NVIDIA swarm → Nemo pack when present, else brockston ref in find_reference_wav
     "nemoclaw": "nemo",
     "nemotron": "nemo",
-    "mistral": "brockston",
+    "nemo-tron": "nemo",
+    "nemo_tron": "nemo",
+    "nvidia-nemotron": "nemo",
+    "nvidia_nemotron": "nemo",
+    "mistral": "nemo",  # Mistral-Nemotron → Nemo voice pack
+    "mistral-nemotron": "nemo",
+    "mistral_nemotron": "nemo",
     "kimi": "kimi",
     "kimi26": "kimi",
     "kimi27": "kimi",
@@ -198,9 +204,9 @@ def find_reference_wav(being: str) -> Optional[Path]:
             if path.exists():
                 return path
 
+    # Being-specific only first (do not steal generic simple_phrases for named beings)
     search_dirs: list[Path] = [
         incoming_dir(key),
-        VOICE_CENTER / "incoming" / "simple_phrases",
         packs_dir(key),
     ]
     for directory in search_dirs:
@@ -216,21 +222,100 @@ def find_reference_wav(being: str) -> Optional[Path]:
         if audio_files:
             return audio_files[0]
 
-    # Fallback so NO being is stuck on macOS say TTS
+    # Until Nemo (etc.) has his own pack — use best available family ref
     if key != "brockston":
         default = find_reference_wav("brockston")
         if default:
-            logger = logging.getLogger(__name__)
-            logger.info("[TTS] No ref for %s — falling back to brockston reference for XTTS", being)
+            logger.info(
+                "[TTS] No pack/ref for %s — using available brockston reference for XTTS",
+                being,
+            )
             return default
 
-    # Last resort: any wav in the voice center
-    for directory in [VOICE_CENTER / "incoming" / "simple_phrases", incoming_dir("brockston")]:
+    # Last resort: simple phrases or any brockston incoming
+    for directory in [incoming_dir("brockston"), VOICE_CENTER / "incoming" / "simple_phrases"]:
         if directory.is_dir():
-            wavs = list(directory.glob("*.wav"))
+            wavs = sorted(directory.glob("*.wav"), key=lambda p: p.stat().st_mtime, reverse=True)
             if wavs:
                 return wavs[0]
     return None
+
+
+_XTTS_PYTHON_CACHE: Optional[Path] = None
+_XTTS_PYTHON_CHECKED: bool = False
+
+
+def resolve_xtts_python() -> Optional[Path]:
+    """
+    Python that can import torch + Coqui TTS for christman_sound XTTS.
+
+    Studio-local only (Brockston-Studio). Cached after first success.
+    Order:
+      1. CHRISTMAN_XTTS_PYTHON env
+      2. christman_sound/.venv_py311  (Coqui TTS needs Python < 3.12)
+      3. christman_sound/.venv
+      4. backend/venv (only if torch+TTS installed there)
+    """
+    global _XTTS_PYTHON_CACHE, _XTTS_PYTHON_CHECKED
+    if _XTTS_PYTHON_CHECKED:
+        return _XTTS_PYTHON_CACHE
+
+    candidates: list[Path] = []
+    env_py = os.getenv("CHRISTMAN_XTTS_PYTHON", "").strip()
+    if env_py:
+        candidates.append(Path(env_py).expanduser())
+    candidates.extend(
+        [
+            CHRISTMAN_SOUND_ROOT / ".venv_py311" / "bin" / "python",
+            BASE_DIR / "christman_sound" / ".venv_py311" / "bin" / "python",
+            CHRISTMAN_SOUND_ROOT / ".venv" / "bin" / "python",
+            BASE_DIR / "christman_sound" / ".venv" / "bin" / "python",
+            BASE_DIR / "backend" / "venv" / "bin" / "python",
+            Path(sys.executable),
+        ]
+    )
+    seen: set[str] = set()
+    found: Optional[Path] = None
+    for py in candidates:
+        key = str(py)
+        if key in seen:
+            continue
+        seen.add(key)
+        if not py.is_file() and not py.is_symlink():
+            continue
+        if not os.access(py, os.X_OK):
+            continue
+        if _python_has_xtts_stack(py):
+            found = py
+            break
+    _XTTS_PYTHON_CACHE = found
+    _XTTS_PYTHON_CHECKED = True
+    return found
+
+
+def _python_has_xtts_stack(python: Path) -> bool:
+    """True if this interpreter can import torch and TTS."""
+    import subprocess
+
+    try:
+        r = subprocess.run(
+            [
+                str(python),
+                "-c",
+                "import torch; import TTS; print('ok')",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=45,
+            env={**os.environ, "COQUI_TOS_AGREED": "1"},
+        )
+        return r.returncode == 0 and "ok" in (r.stdout or "")
+    except Exception:
+        return False
+
+
+def xtts_worker_script() -> Path:
+    return BASE_DIR / "backend" / "xtts_worker.py"
 
 
 def try_express_audio(text: str, being: str) -> Optional[bytes]:
@@ -273,6 +358,7 @@ def sound_stack_status() -> dict:
             "pack_registered": pack_manifest.exists(),
             "incoming_path": str(inc),
         }
+    xtts_py = resolve_xtts_python()
     return {
         "christman_sound_root": str(CHRISTMAN_SOUND_ROOT),
         "sound_root_exists": CHRISTMAN_SOUND_ROOT.is_dir(),
@@ -285,6 +371,14 @@ def sound_stack_status() -> dict:
         "voice_creation_center_active": True,
         "registered_packs": _inventory_pack_ids(),
         "beings": beings_ready,
+        "xtts_python": str(xtts_py) if xtts_py else None,
+        "xtts_ready": bool(xtts_py),
+        "xtts_worker": str(xtts_worker_script()),
+        "xtts_worker_exists": xtts_worker_script().is_file(),
+        "stack_note": (
+            "Brockston-Studio christman_sound + christman_voice_sdk only "
+            "(not BROCKSTON project)"
+        ),
     }
 
 

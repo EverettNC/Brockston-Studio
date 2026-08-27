@@ -1,5 +1,5 @@
 """
-Mistral Medium 3.5 — NVIDIA NIM instructor for deep reasoning in Brockston Studio.
+Mistral-Nemotron — NVIDIA NIM instructor for deep reasoning in Brockston Studio.
 """
 
 from __future__ import annotations
@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -24,19 +24,21 @@ NVIDIA_CHAT_URL = os.getenv(
 )
 NVIDIA_MISTRAL_MODEL = os.getenv(
     "NVIDIA_MISTRAL_MODEL",
-    "mistralai/mistral-medium-3.5-128b",
+    "mistralai/mistral-nemotron",
 )
-NVIDIA_MISTRAL_TEMPERATURE = float(os.getenv("NVIDIA_MISTRAL_TEMPERATURE", "0.70"))
-NVIDIA_MISTRAL_TOP_P = float(os.getenv("NVIDIA_MISTRAL_TOP_P", "1.00"))
-NVIDIA_MISTRAL_MAX_TOKENS = int(os.getenv("NVIDIA_MISTRAL_MAX_TOKENS", "16384"))
-NVIDIA_MISTRAL_REASONING_EFFORT = os.getenv("NVIDIA_MISTRAL_REASONING_EFFORT", "high")
-NVIDIA_MISTRAL_TIMEOUT = float(os.getenv("NVIDIA_MISTRAL_TIMEOUT_SEC", "300"))
+NVIDIA_MISTRAL_TEMPERATURE = float(os.getenv("NVIDIA_MISTRAL_TEMPERATURE", "0.60"))
+NVIDIA_MISTRAL_TOP_P = float(os.getenv("NVIDIA_MISTRAL_TOP_P", "0.70"))
+NVIDIA_MISTRAL_MAX_TOKENS = int(os.getenv("NVIDIA_MISTRAL_MAX_TOKENS", "4096"))
+# Official mistral-nemotron sample does not require reasoning_effort.
+# Set NVIDIA_MISTRAL_REASONING_EFFORT=high only if your account supports it.
+NVIDIA_MISTRAL_REASONING_EFFORT = os.getenv("NVIDIA_MISTRAL_REASONING_EFFORT", "").strip()
+NVIDIA_MISTRAL_TIMEOUT = float(os.getenv("NVIDIA_MISTRAL_TIMEOUT_SEC", "180"))
 NVIDIA_MISTRAL_MIN_INTERVAL = float(os.getenv("NVIDIA_MISTRAL_MIN_INTERVAL_SEC", "2.5"))
 NVIDIA_MISTRAL_429_RETRIES = int(os.getenv("NVIDIA_MISTRAL_429_RETRIES", "3"))
 
 _last_nvidia_call = 0.0
 
-MISTRAL_SYSTEM = """You are Mistral in Brockston Studio — The Christman AI Project IDE.
+MISTRAL_SYSTEM = """You are Mistral-Nemotron in Brockston Studio — The Christman AI Project IDE.
 Everett Christman is your partner. You reason carefully about architecture, trade-offs,
 and complex engineering decisions. Be direct, structured, and honest.
 You see workspace context from the IDE. Never use generic AI disclaimers."""
@@ -61,7 +63,7 @@ class MistralService:
             logger.info(
                 "[MistralService] online — NVIDIA %s (reasoning=%s)",
                 NVIDIA_MISTRAL_MODEL,
-                NVIDIA_MISTRAL_REASONING_EFFORT,
+                NVIDIA_MISTRAL_REASONING_EFFORT or "off",
             )
         else:
             logger.warning("[MistralService] NVIDIA_MISTRAL_API_KEY not set — fallback to Ollama")
@@ -83,7 +85,7 @@ class MistralService:
                 "url": NVIDIA_CHAT_URL.rsplit("/v1", 1)[0] + "/v1",
                 "api_key_env": "NVIDIA_MISTRAL_API_KEY",
                 "api_key_set": True,
-                "reasoning_effort": NVIDIA_MISTRAL_REASONING_EFFORT,
+                "reasoning_effort": NVIDIA_MISTRAL_REASONING_EFFORT or "off",
             }
         return {
             "backend": "ollama",
@@ -93,7 +95,8 @@ class MistralService:
             "api_key_set": False,
         }
 
-    def generate_content(self, prompt: str, context: Optional[str] = None) -> str:
+    def generate_content(self, prompt: str, context: Optional[str] = None, **_kwargs) -> str:
+        """kwargs accepted so agent loops can pass mode=/model= without crashing."""
         system = MISTRAL_SYSTEM
         if context:
             system = f"{system}\n\n{context}"
@@ -106,6 +109,20 @@ class MistralService:
 
         return get_ai_response(prompt, system=system, target="ollama", model=LLM_MODEL_GENERAL)
 
+    def _build_payload(self, messages: List[Dict[str, str]], *, use_reasoning: bool) -> Dict[str, Any]:
+        # Match NVIDIA docs for mistralai/mistral-nemotron
+        payload: Dict[str, Any] = {
+            "model": NVIDIA_MISTRAL_MODEL,
+            "messages": messages,
+            "max_tokens": NVIDIA_MISTRAL_MAX_TOKENS,
+            "temperature": NVIDIA_MISTRAL_TEMPERATURE,
+            "top_p": NVIDIA_MISTRAL_TOP_P,
+            "stream": False,
+        }
+        if use_reasoning and NVIDIA_MISTRAL_REASONING_EFFORT:
+            payload["reasoning_effort"] = NVIDIA_MISTRAL_REASONING_EFFORT
+        return payload
+
     def _call_nvidia(self, *, system: str, user_content: str) -> str:
         if not _mistral_key():
             raise RuntimeError("NVIDIA_MISTRAL_API_KEY not set")
@@ -114,64 +131,93 @@ class MistralService:
             {"role": "system", "content": system},
             {"role": "user", "content": user_content},
         ]
-        payload: Dict[str, Any] = {
-            "model": NVIDIA_MISTRAL_MODEL,
-            "reasoning_effort": NVIDIA_MISTRAL_REASONING_EFFORT,
-            "messages": messages,
-            "max_tokens": NVIDIA_MISTRAL_MAX_TOKENS,
-            "temperature": NVIDIA_MISTRAL_TEMPERATURE,
-            "top_p": NVIDIA_MISTRAL_TOP_P,
-            "stream": False,
-        }
         headers = {
             "Authorization": f"Bearer {_mistral_key()}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
 
-        backoff = [0, 3, 8, 15]
+        # First try without reasoning_effort (official sample). Retry with it only if configured.
+        attempts_plan: List[bool] = [False]
+        if NVIDIA_MISTRAL_REASONING_EFFORT:
+            attempts_plan.append(True)
+
         last_exc: Optional[Exception] = None
+        backoff = [0, 3, 8]
 
-        for attempt in range(min(NVIDIA_MISTRAL_429_RETRIES + 1, len(backoff))):
-            if backoff[attempt]:
-                time.sleep(backoff[attempt])
-            _throttle_nvidia()
-            try:
-                r = httpx.post(
-                    NVIDIA_CHAT_URL,
-                    headers=headers,
-                    json=payload,
-                    timeout=NVIDIA_MISTRAL_TIMEOUT,
-                )
-                if r.status_code == 429:
-                    last_exc = RuntimeError("NVIDIA rate limit (429) for Mistral")
-                    continue
-                if 500 <= r.status_code < 600:
-                    last_exc = RuntimeError(
-                        f"NVIDIA server error {r.status_code}: {r.text[:200]}"
+        for use_reasoning in attempts_plan:
+            payload = self._build_payload(messages, use_reasoning=use_reasoning)
+            for attempt in range(min(NVIDIA_MISTRAL_429_RETRIES + 1, len(backoff))):
+                if backoff[attempt]:
+                    time.sleep(backoff[attempt])
+                _throttle_nvidia()
+                try:
+                    r = httpx.post(
+                        NVIDIA_CHAT_URL,
+                        headers=headers,
+                        json=payload,
+                        timeout=NVIDIA_MISTRAL_TIMEOUT,
                     )
-                    continue
-                r.raise_for_status()
-                data = r.json()
-                choices = data.get("choices") or []
-                if not choices:
-                    return ""
-                msg = choices[0].get("message") or {}
-                content = (msg.get("content") or "").strip()
-                reasoning = (msg.get("reasoning_content") or "").strip()
-                return content or reasoning
-            except httpx.HTTPStatusError as exc:
-                if exc.response.status_code == 429:
-                    last_exc = RuntimeError("NVIDIA rate limit (429) for Mistral")
-                    continue
-                if 500 <= exc.response.status_code < 600:
+                    # NVIDIA often returns 404 when the key cannot access that model function
+                    if r.status_code in (404, 410):
+                        detail = (r.text or "")[:240]
+                        last_exc = RuntimeError(
+                            f"NVIDIA {r.status_code} for model {NVIDIA_MISTRAL_MODEL} "
+                            f"(account may lack this NIM, or model id wrong): {detail}"
+                        )
+                        logger.error("[Mistral] %s", last_exc)
+                        # no point retrying same model
+                        break
+                    if r.status_code == 429:
+                        last_exc = RuntimeError("NVIDIA rate limit (429) for Mistral-Nemotron")
+                        continue
+                    if 500 <= r.status_code < 600:
+                        last_exc = RuntimeError(
+                            f"NVIDIA server error {r.status_code}: {r.text[:200]}"
+                        )
+                        continue
+                    r.raise_for_status()
+                    data = r.json()
+                    choices = data.get("choices") or []
+                    if not choices:
+                        return ""
+                    msg = choices[0].get("message") or {}
+                    content = (msg.get("content") or "").strip()
+                    reasoning = (msg.get("reasoning_content") or "").strip()
+                    return content or reasoning
+                except httpx.TimeoutException as exc:
                     last_exc = RuntimeError(
-                        f"NVIDIA server error {exc.response.status_code}"
+                        f"NVIDIA timeout after {NVIDIA_MISTRAL_TIMEOUT:.0f}s for {NVIDIA_MISTRAL_MODEL}"
                     )
+                    logger.warning("[Mistral] %s", last_exc)
                     continue
-                raise
+                except httpx.HTTPStatusError as exc:
+                    code = exc.response.status_code
+                    if code in (404, 410):
+                        last_exc = RuntimeError(
+                            f"NVIDIA {code} model/account not available for {NVIDIA_MISTRAL_MODEL}"
+                        )
+                        break
+                    if code == 429:
+                        last_exc = RuntimeError("NVIDIA rate limit (429) for Mistral-Nemotron")
+                        continue
+                    if 500 <= code < 600:
+                        last_exc = RuntimeError(f"NVIDIA server error {code}")
+                        continue
+                    last_exc = RuntimeError(f"NVIDIA HTTP {code}: {exc.response.text[:200]}")
+                    break
+                except Exception as exc:
+                    last_exc = exc
+                    break
+            else:
+                continue
+            # 404/410 broke out — try next plan or raise
+            if last_exc and "404" in str(last_exc) or (last_exc and "410" in str(last_exc)):
+                if use_reasoning is False and NVIDIA_MISTRAL_REASONING_EFFORT:
+                    continue
+                break
 
-        raise last_exc or RuntimeError("NVIDIA Mistral unavailable")
+        raise last_exc or RuntimeError("NVIDIA Mistral-Nemotron unavailable")
 
 
 _mistral_instance: Optional[MistralService] = None

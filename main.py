@@ -80,14 +80,14 @@ except Exception as e:
     _nemoclaw_svc = None
     logger.warning(f"NemoClaw service not available: {e}")
 
-# Mistral Medium 3.5 — NVIDIA reasoning instructor
+# Mistral-Nemotron — NVIDIA reasoning instructor
 try:
     from backend.mistral_service import get_mistral_service
     _mistral_svc = get_mistral_service()
-    logger.info("Mistral linked — available at /api/mistral")
+    logger.info("Mistral-Nemotron linked — available at /api/mistral")
 except Exception as e:
     _mistral_svc = None
-    logger.warning(f"Mistral service not available: {e}")
+    logger.warning(f"Mistral-Nemotron service not available: {e}")
 
 # Kimi K2.6 + K2.7 — NVIDIA NIM learning tutor swarm (partner deck + code + kids)
 try:
@@ -252,7 +252,7 @@ async def health_check():
                 "api_key_set": bool(_nemo_svc and _nemo_svc.api_key_configured),
             },
             "mistral": {
-                "name": "Mistral",
+                "name": "Mistral-Nemotron",
                 "backend": mistral_wiring.get("backend", "offline"),
                 "model": mistral_wiring.get("model", NVIDIA_MISTRAL_MODEL),
                 "label": mistral_wiring.get("label", "unavailable"),
@@ -427,12 +427,29 @@ async def _run_project_review(
             scope_root=project_path,
         )
     elif instructor == "mistral" and _mistral_svc:
-        loop = asyncio.get_event_loop()
-        reply = await loop.run_in_executor(
-            None,
-            lambda: _mistral_svc.generate_content(task, context=full_context),
-        )
-        result = {"text": reply, "tool_count": 0, "tools_executed": []}
+        # Tool-loop review like other NVIDIA instructors (not a raw one-shot).
+        # generate_content already falls back to Ollama on NVIDIA 404/timeout.
+        from backend.being_agent import run_nvidia_agent
+        try:
+            result = await run_nvidia_agent(
+                _mistral_svc,
+                message=task,
+                context=full_context,
+                mode="code",
+                max_steps=max_steps,
+                scope_root=project_path,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Mistral-Nemotron review agent failed (%s) — one-shot fallback",
+                exc,
+            )
+            loop = asyncio.get_event_loop()
+            reply = await loop.run_in_executor(
+                None,
+                lambda: _mistral_svc.generate_content(task, context=full_context),
+            )
+            result = {"text": reply, "tool_count": 0, "tools_executed": []}
     elif instructor == "grok" and _grok_svc and _grok_svc.is_available:
         from backend.being_agent import run_being_agent as _run_ba
         loop = asyncio.get_event_loop()
@@ -724,10 +741,10 @@ async def nemoclaw_endpoint(request: NemoClawRequest):
 
 @app.post("/api/mistral")
 async def mistral_endpoint(request: MistralRequest):
-    """Mistral Medium 3.5 — deep reasoning instructor."""
-    logger.info("Mistral request: %s", request.message[:120])
+    """Mistral-Nemotron — deep reasoning instructor (NVIDIA NIM)."""
+    logger.info("Mistral-Nemotron request: %s", request.message[:120])
     if not _mistral_svc:
-        raise fastapi.HTTPException(status_code=503, detail="Mistral service not available")
+        raise fastapi.HTTPException(status_code=503, detail="Mistral-Nemotron service not available")
     try:
         from backend.being_context import build_being_context, extract_project_root_path
 
@@ -1380,7 +1397,7 @@ async def websocket_viewer(websocket: fastapi.WebSocket):
                     "claude": "claude-sonnet-4 (Anthropic API)",
                     "nemoclaw": "nvidia/nemotron-3-ultra-550b-a55b (NemoClaw agent)",
                     "nemotron": "nvidia/nemotron-3-ultra-550b-a55b (NVIDIA NIM)",
-                    "mistral": "mistralai/mistral-medium-3.5-128b (NVIDIA NIM)",
+                    "mistral": "mistralai/mistral-nemotron (NVIDIA NIM)",
                 },
                 "endpoints": {
                     "family_chat": "/api/chat",

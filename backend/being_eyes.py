@@ -77,17 +77,57 @@ def _safe_path(raw: str) -> Path:
 
 # ── Screenshot ─────────────────────────────────────────────────────────────────
 
+def _capture_screen_png(tmp_path: str, display: int | None = None) -> tuple[int, str]:
+    """
+    Run macOS screencapture into tmp_path.
+
+    -D display numbers are 1-based on macOS (main = 1). 0 / negative = auto main.
+    Tries requested display, then 1→3, then bare screencapture (main).
+    Returns (display_used_or_0_for_main, empty_err). Raises RuntimeError on total fail.
+    """
+    # Build attempt list: preferred first, then fallbacks (unique, valid)
+    attempts: list[list[str]] = []
+    preferred = display if display is not None else 1
+    if preferred and preferred > 0:
+        attempts.append(["screencapture", "-x", "-D", str(preferred), tmp_path])
+    # Fallbacks: main displays 1-3, then no -D (main screen)
+    for d in (1, 2, 3):
+        if d == preferred:
+            continue
+        attempts.append(["screencapture", "-x", "-D", str(d), tmp_path])
+    attempts.append(["screencapture", "-x", tmp_path])
+
+    errors: list[str] = []
+    for cmd in attempts:
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except Exception:
+            pass
+        result = subprocess.run(cmd, capture_output=True, timeout=15)
+        err = (result.stderr or b"").decode("utf-8", errors="replace")[:300]
+        if result.returncode == 0 and Path(tmp_path).is_file() and Path(tmp_path).stat().st_size > 0:
+            used = 0
+            if "-D" in cmd:
+                used = int(cmd[cmd.index("-D") + 1])
+            return used, ""
+        errors.append(f"{' '.join(cmd[:-1])} → rc={result.returncode} {err}".strip())
+
+    raise RuntimeError("; ".join(errors)[:800])
+
+
 @router.get("/screenshot")
 async def get_screenshot(
-    display: int = Query(default=0, description="Display index (macOS screencapture -D)")
+    display: int = Query(
+        default=1,
+        description="macOS display for screencapture -D (1=main). Use 0 for auto.",
+    )
 ):
     """
-    Capture the entire screen and return it as a base64-encoded PNG.
-    Uses macOS screencapture (built-in, zero cost, no dependencies).
-    The being can pass this image to a vision model to understand what's on screen.
+    Capture the screen as base64 PNG so beings can SEE (vision).
+    Uses macOS screencapture — zero cloud, zero cost.
 
-    Returns:
-        {"status": "ok", "format": "png", "encoding": "base64", "data": "<base64>", "width": int, "height": int}
+    display: 1–3 = specific screen; 0 = auto (try main, then others).
     """
     if os.uname().sysname != "Darwin":
         raise HTTPException(status_code=501, detail="Screenshot only supported on macOS (screencapture).")
@@ -96,25 +136,23 @@ async def get_screenshot(
         tmp_path = tmp.name
 
     try:
-        result = subprocess.run(
-            ["screencapture", "-x", "-D", str(display), tmp_path],
-            capture_output=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
+        try:
+            preferred = None if display <= 0 else display
+            used_display, _ = _capture_screen_png(tmp_path, preferred)
+        except RuntimeError as exc:
             raise HTTPException(
                 status_code=500,
-                detail=f"screencapture failed: {result.stderr.decode()[:500]}"
-            )
+                detail=(
+                    f"screencapture failed: {exc}. "
+                    "Grant Screen Recording to Terminal/Python/Studio in "
+                    "System Settings → Privacy & Security → Screen Recording."
+                ),
+            ) from exc
 
         shot_path = Path(tmp_path)
-        if not shot_path.exists() or shot_path.stat().st_size == 0:
-            raise HTTPException(status_code=500, detail="screencapture produced empty file.")
-
         raw_bytes = shot_path.read_bytes()
         encoded = base64.b64encode(raw_bytes).decode("ascii")
 
-        # Try to get dimensions via sips (also macOS built-in)
         width, height = None, None
         try:
             sips = subprocess.run(
@@ -129,7 +167,13 @@ async def get_screenshot(
         except Exception:
             pass
 
-        logger.info(f"[BeingEyes] Screenshot captured: {len(raw_bytes)//1024}KB {width}x{height}")
+        logger.info(
+            "[BeingEyes] Screenshot captured: %dKB %sx%s display=%s",
+            len(raw_bytes) // 1024,
+            width,
+            height,
+            used_display or "main",
+        )
         return {
             "status": "ok",
             "format": "png",
@@ -137,6 +181,7 @@ async def get_screenshot(
             "size_kb": round(len(raw_bytes) / 1024, 1),
             "width": width,
             "height": height,
+            "display": used_display or 1,
             "data": encoded,
         }
     finally:

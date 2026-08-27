@@ -14,7 +14,10 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Long chunks kill XTTS (cold load + RTF~2×). Keep closed-loop chunks short.
 TTS_MAX_CHUNK_CHARS = int(os.getenv("TTS_MAX_CHUNK_CHARS", "3500"))
+# Used for christman_sound XTTS worker path (macOS say can still use larger)
+XTTS_CHUNK_CHARS = int(os.getenv("XTTS_CHUNK_CHARS", "280"))
 
 
 def _chunk_text_for_tts(text: str, max_chars: int = TTS_MAX_CHUNK_CHARS) -> list[str]:
@@ -133,32 +136,25 @@ class SpeechService:
     async def synthesize_speech(self, text: str, voice_id: str = "default") -> bytes:
         """
         christman_sound XTTS when a being reference WAV exists, else macOS say.
-        Long replies are chunked and concatenated so voice mode reads everything.
+        One XTTS worker call per utterance (model loads once; worker splits sentences).
         christman_sound only — ear canal, voice SDK, reference WAVs. No Polly/ElevenLabs.
         """
         import asyncio
 
-        chunks = _chunk_text_for_tts(text)
-        if not chunks:
+        cleaned = (text or "").strip()
+        if not cleaned:
             raise RuntimeError("No text to synthesize")
 
+        logger.info("[TTS] synthesize %d char(s) voice_id=%s", len(cleaned), voice_id)
+
         loop = asyncio.get_event_loop()
-        parts: list[bytes] = []
-        for i, chunk in enumerate(chunks):
-            audio = await loop.run_in_executor(
-                None, lambda c=chunk: self._synthesize_one_chunk(c, voice_id)
-            )
-            if audio:
-                parts.append(audio)
-            else:
-                logger.warning("[TTS] chunk %d/%d produced no audio", i + 1, len(chunks))
-
-        if not parts:
-            raise RuntimeError("TTS produced no audio for any chunk")
-
-        if len(parts) == 1:
-            return parts[0]
-        return await loop.run_in_executor(None, lambda: self._concat_mp3(parts))
+        # Single pass: worker handles sentence packing (avoids N× model reloads)
+        audio = await loop.run_in_executor(
+            None, lambda: self._synthesize_one_chunk(cleaned, voice_id)
+        )
+        if not audio:
+            raise RuntimeError("TTS produced no audio")
+        return audio
 
     def _synthesize_one_chunk(self, text: str, voice_id: str) -> bytes | None:
         """Synthesize a single chunk — express → XTTS → macOS male say."""
@@ -183,8 +179,29 @@ class SpeechService:
             self.last_engine_detail = f"being={being}"
             return christman_audio
 
-        # macOS say — male voice map (Daniel, Fred, Alex, etc.)
-        # HONESTY: this is robot fallback, not closed-loop christman_sound.
+        # Apple TTS is OFF by default once closed-loop stack exists.
+        # Set CHRISTMAN_ALLOW_ROBOT_TTS=1 only if you explicitly want macOS say.
+        allow_robot = os.getenv("CHRISTMAN_ALLOW_ROBOT_TTS", "0").strip().lower() in (
+            "1", "true", "yes", "on",
+        )
+        if not allow_robot:
+            self.last_engine = "xtts_failed"
+            self.last_engine_detail = (
+                f"being={being} — closed-loop XTTS failed; Apple say blocked "
+                f"(CHRISTMAN_ALLOW_ROBOT_TTS=0). Check warm server :8766 or logs."
+            )
+            logger.error(
+                "[TTS] REFUSING Apple robot voice being=%s chars=%d — XTTS offline/slow. "
+                "Start: christman_sound/.venv_py311/bin/python backend/xtts_server.py",
+                being,
+                len(text),
+            )
+            raise RuntimeError(
+                "Closed-loop christman_sound XTTS unavailable — "
+                "Apple TTS blocked. Warm XTTS server on :8766 or check logs/ide.log."
+            )
+
+        # macOS say — explicit opt-in only (not closed-loop)
         voice = macos_voice_for_being(voice_id)
         if voice_id and voice_id not in ("default", "") and voice_id in (
             "Daniel", "Fred", "Alex", "Albert", "Ralph", "Reed", "Eddy", "Grandpa"
@@ -215,13 +232,11 @@ class SpeechService:
             audio = Path(mp3_path).read_bytes()
             self.last_engine = "macos_say_fallback"
             self.last_engine_detail = (
-                f"voice={voice} being={being} - closed-loop XTTS unavailable "
-                f"(need torch+TTS in backend/venv)"
+                f"voice={voice} being={being} — EXPLICIT robot fallback "
+                f"(CHRISTMAN_ALLOW_ROBOT_TTS=1)"
             )
             logger.error(
-                "[TTS] ROBOT VOICE FALLBACK — macOS say voice=%s being=%s (%d chars). "
-                "christman_sound XTTS did not run. Install torch+TTS into backend/venv "
-                "for closed-loop christman_sound (skill: closed-loop audio production).",
+                "[TTS] ROBOT VOICE (opt-in) — macOS say voice=%s being=%s (%d chars).",
                 voice,
                 being,
                 len(text),
@@ -234,7 +249,6 @@ class SpeechService:
                     os.unlink(p)
                 except Exception:
                     pass
-
     @staticmethod
     def _concat_mp3(parts: list[bytes]) -> bytes:
         """Join MP3 chunks into one stream for uninterrupted playback."""
@@ -324,7 +338,11 @@ class SpeechService:
                     pass
 
     def _synthesize_christman_sound(self, text: str, being: str) -> bytes | None:
-        """christman_sound XTTS via XTTSEngine — return MP3 or None."""
+        """
+        Closed-loop christman_sound XTTS via Studio christman_voice_sdk.
+
+        Order: warm daemon :8766 → in-process → cold worker subprocess.
+        """
         from pathlib import Path
 
         try:
@@ -332,6 +350,8 @@ class SpeechService:
                 ensure_sound_paths,
                 find_reference_wav,
                 load_being_manifest,
+                resolve_xtts_python,
+                xtts_worker_script,
             )
 
             ensure_sound_paths()
@@ -339,41 +359,59 @@ class SpeechService:
             ref = find_reference_wav(being)
             if not ref:
                 logger.warning(
-                    "[TTS] No reference WAV for being=%s — cannot clone voice (will fall back to macOS say)",
+                    "[TTS] No reference WAV for being=%s — cannot clone voice",
                     being,
                 )
                 return None
 
-            from christman_voice_sdk.engines.xtts_engine import XTTSEngine
+            chunk = text[:TTS_MAX_CHUNK_CHARS]
 
-            engine = XTTSEngine()
-            engine.load_voice(ref)
-            synth_result = engine.synthesize(
-                text[:TTS_MAX_CHUNK_CHARS],
-                language="en",
-            )
-            if synth_result and getattr(synth_result, "audio", None) is not None:
-                import numpy as np
-                from scipy.io.wavfile import write as write_wav
-                import tempfile
+            # 1) Warm daemon (model stays loaded — kills Apple fallback from timeouts)
+            warm = self._synthesize_xtts_daemon(chunk, ref)
+            if warm:
+                logger.info(
+                    "[TTS] christman_sound XTTS daemon %dKB being=%s ref=%s",
+                    len(warm) // 1024,
+                    being,
+                    ref.name,
+                )
+                return warm
 
-                tmp = Path(tempfile.mktemp(suffix=".wav"))
-                sr = getattr(synth_result, "sample_rate", 22050)
-                audio_arr = np.asarray(synth_result.audio)
-                if audio_arr.dtype != np.int16:
-                    audio_arr = (audio_arr * 32767).astype(np.int16)
-                write_wav(str(tmp), sr, audio_arr)
-                audio = self._to_mp3_bytes(tmp.read_bytes())
-                tmp.unlink(missing_ok=True)
-                if audio:
-                    logger.info(
-                        "[TTS] christman_sound XTTS %dKB being=%s pack=%s ref=%s",
-                        len(audio) // 1024,
-                        being,
-                        (manifest or {}).get("pack_id"),
-                        ref.name,
-                    )
-                    return audio
+            # 2) In-process (backend/venv usually lacks torch)
+            in_proc = self._synthesize_xtts_inprocess(chunk, ref)
+            if in_proc:
+                logger.info(
+                    "[TTS] christman_sound XTTS in-process %dKB being=%s pack=%s ref=%s",
+                    len(in_proc) // 1024,
+                    being,
+                    (manifest or {}).get("pack_id"),
+                    ref.name,
+                )
+                return in_proc
+
+            # 3) Cold worker
+            xtts_py = resolve_xtts_python()
+            worker = xtts_worker_script()
+            if not xtts_py:
+                logger.warning(
+                    "[TTS] No Studio XTTS python (need torch+TTS in christman_sound/.venv_py311). being=%s",
+                    being,
+                )
+                return None
+            if not worker.is_file():
+                logger.warning("[TTS] xtts_worker.py missing at %s", worker)
+                return None
+
+            via_worker = self._synthesize_xtts_worker(chunk, ref, xtts_py, worker)
+            if via_worker:
+                logger.info(
+                    "[TTS] christman_sound XTTS worker %dKB being=%s ref=%s py=%s",
+                    len(via_worker) // 1024,
+                    being,
+                    ref.name,
+                    xtts_py,
+                )
+                return via_worker
 
             logger.warning(
                 "[TTS] christman_sound XTTS returned no audio for being=%s ref=%s",
@@ -384,6 +422,140 @@ class SpeechService:
         except Exception as exc:
             logger.warning("[TTS] christman_sound failed being=%s: %s", being, exc)
             return None
+
+    def _synthesize_xtts_daemon(self, text: str, ref: "Path") -> bytes | None:
+        """POST to warm XTTS server on :8766 (model already in RAM)."""
+        import json
+
+        host = os.getenv("CHRISTMAN_XTTS_HOST", "127.0.0.1")
+        port = int(os.getenv("CHRISTMAN_XTTS_PORT", "8766"))
+        url = f"http://{host}:{port}/synth"
+        timeout = float(os.getenv("CHRISTMAN_XTTS_DAEMON_TIMEOUT", "900"))
+        try:
+            import urllib.request
+
+            payload = json.dumps(
+                {"text": text, "ref": str(ref), "language": "en"}
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                wav = resp.read()
+            if not wav or len(wav) < 100:
+                return None
+            return self._to_mp3_bytes(wav)
+        except Exception as exc:
+            logger.info("[TTS] warm daemon unavailable (%s) — try worker", exc)
+            return None
+
+    def _synthesize_xtts_inprocess(self, text: str, ref: "Path") -> bytes | None:
+        """Try XTTSEngine in this process (backend/venv often lacks torch)."""
+        from pathlib import Path
+        import tempfile
+
+        try:
+            import torch  # noqa: F401
+            import TTS  # noqa: F401
+            from christman_voice_sdk.engines.xtts_engine import XTTSEngine
+            import numpy as np
+            from scipy.io.wavfile import write as write_wav
+
+            engine = XTTSEngine()
+            engine.load_voice(ref)
+            synth_result = engine.synthesize(text, language="en")
+            if not synth_result or getattr(synth_result, "audio", None) is None:
+                return None
+            tmp = Path(tempfile.mktemp(suffix=".wav"))
+            sr = getattr(synth_result, "sample_rate", 24000)
+            audio_arr = np.asarray(synth_result.audio)
+            if audio_arr.dtype != np.int16:
+                audio_arr = (audio_arr * 32767).astype(np.int16)
+            write_wav(str(tmp), sr, audio_arr)
+            audio = self._to_mp3_bytes(tmp.read_bytes())
+            tmp.unlink(missing_ok=True)
+            return audio
+        except Exception as exc:
+            logger.debug("[TTS] in-process XTTS unavailable: %s", exc)
+            return None
+
+    def _synthesize_xtts_worker(
+        self,
+        text: str,
+        ref: "Path",
+        xtts_py: "Path",
+        worker: "Path",
+    ) -> bytes | None:
+        """Spawn Studio christman_sound/.venv worker — full XTTS via voice SDK."""
+        import subprocess
+        import tempfile
+        from pathlib import Path
+
+        out_wav = Path(tempfile.mktemp(suffix=".wav"))
+        try:
+            env = os.environ.copy()
+            env.setdefault("COQUI_TOS_AGREED", "1")
+            env.setdefault("NUMBA_CACHE_DIR", "/tmp/christman_numba_cache")
+            env.setdefault("XTTS_CHUNK_CHARS", str(XTTS_CHUNK_CHARS))
+            # One process: load model once + N sentence packs. RTF can be high on CPU.
+            base = int(os.getenv("CHRISTMAN_XTTS_TIMEOUT", "600"))
+            timeout_s = max(base, 120 + len(text) * 3)
+            timeout_s = min(timeout_s, int(os.getenv("CHRISTMAN_XTTS_TIMEOUT_CAP", "1200")))
+            text_file = Path(tempfile.mktemp(suffix=".txt"))
+            text_file.write_text(text, encoding="utf-8")
+            logger.info(
+                "[TTS] xtts_worker start chars=%d timeout=%ds ref=%s",
+                len(text),
+                timeout_s,
+                ref.name,
+            )
+            try:
+                r = subprocess.run(
+                    [
+                        str(xtts_py),
+                        str(worker),
+                        "--text-file",
+                        str(text_file),
+                        "--ref",
+                        str(ref),
+                        "--out",
+                        str(out_wav),
+                        "--language",
+                        "en",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout_s,
+                    env=env,
+                )
+            finally:
+                try:
+                    text_file.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            if r.returncode != 0 or not out_wav.is_file():
+                err = (r.stderr or r.stdout or "")[-800:]
+                logger.warning(
+                    "[TTS] xtts_worker failed rc=%s: %s",
+                    r.returncode,
+                    err,
+                )
+                return None
+            return self._to_mp3_bytes(out_wav.read_bytes())
+        except subprocess.TimeoutExpired:
+            logger.warning("[TTS] xtts_worker timed out for ref=%s", ref.name)
+            return None
+        except Exception as exc:
+            logger.warning("[TTS] xtts_worker error: %s", exc)
+            return None
+        finally:
+            try:
+                out_wav.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     def _mock_transcribe(self, audio_data: bytes, filename: str) -> str:
         logger.info(f"MOCK: Received {len(audio_data)} bytes of audio ({filename})")

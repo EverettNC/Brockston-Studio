@@ -1,12 +1,12 @@
 """
-Speech synthesis module.
+LEGACY — gTTS SpeechSynthesisEngine. NOT closed-loop christman_sound.
 
-Provides text-to-speech generation with support for:
-- Multiple languages
-- Regional English accents
-- Adjustable speech rate
-- Optional playback
-- Simple emotion-aware parameter adjustment
+Do not use for beings, SPEAK, or Studio readback.
+Live path: engines/xtts_engine.py, shorty_voice_engine_v3.py,
+           voice_synthesis_orchestrator.py
+
+---
+Historical: multi-language / accent gTTS helper with pygame playback.
 """
 
 from __future__ import annotations
