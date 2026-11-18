@@ -22,6 +22,10 @@ from fastapi.staticfiles import StaticFiles # pyright: ignore[reportMissingImpor
 from fastapi.middleware.cors import CORSMiddleware # pyright: ignore[reportMissingImports]
 from pydantic import BaseModel # pyright: ignore[reportMissingImports]
 
+# Key drop box (Settings panel) wins over .env / shell exports.
+import key_box
+key_box.apply_to_environ()
+
 from config import OLLAMA_BASE_URL, LLM_MODEL_GENERAL, LLM_MODEL_CODER, STUDIO_WORKSPACE, HOST, PORT
 
 STUDIO_BACKEND_MODE = os.getenv(

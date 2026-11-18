@@ -75,6 +75,13 @@ print(
 
 load_dotenv(ENV_PATH, override=True)
 
+# Key drop box (Settings panel) still wins over the .env just loaded.
+try:
+    from backend import key_box as _key_box
+except ImportError:
+    import key_box as _key_box
+_key_box.apply_to_environ()
+
 v = os.getenv("BROCKSTON_OPAQUE_SECRET")
 print("OS_HAS_OPAQUE:", bool(v), "len:", 0 if not v else len(v))
 

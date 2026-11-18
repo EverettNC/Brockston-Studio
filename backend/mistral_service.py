@@ -1,5 +1,11 @@
 """
-Mistral-Nemotron — NVIDIA NIM instructor for deep reasoning in Brockston Studio.
+Mistral — the Mistral button in Ask the Beings.
+
+Order:
+  1. Mistral's own API (api.mistral.ai) with the Mistral key from the key drop box.
+  2. Only if the box has no Mistral key: Mistral-Nemotron on NVIDIA NIM
+     (the answer says so).
+  3. If there is no key of either kind, the answer says "no Mistral key".
 """
 
 from __future__ import annotations
@@ -12,11 +18,26 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from .ai_client import get_ai_response
+from .key_box import get as _box_get
 from .nvidia_keys import mistral_nvidia_key
 
 logger = logging.getLogger(__name__)
 
 LLM_MODEL_GENERAL = os.getenv("LLM_MODEL_GENERAL", "llama3.2")
+
+# Mistral's own API (OpenAI-style chat completions)
+MISTRAL_CHAT_URL = os.getenv("MISTRAL_CHAT_URL", "https://api.mistral.ai/v1/chat/completions")
+MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
+MISTRAL_MAX_TOKENS = int(os.getenv("MISTRAL_MAX_TOKENS", "4096"))
+MISTRAL_TEMPERATURE = float(os.getenv("MISTRAL_TEMPERATURE", "0.6"))
+MISTRAL_TIMEOUT = float(os.getenv("MISTRAL_TIMEOUT_SEC", "180"))
+
+NO_MISTRAL_KEY_MESSAGE = (
+    "No Mistral key. Paste one in Settings → Key drop box → Mistral, then ask again."
+)
+NVIDIA_FALLBACK_NOTE = (
+    "(No Mistral key in the key box, so this answer came from Mistral-Nemotron on NVIDIA.)"
+)
 
 NVIDIA_CHAT_URL = os.getenv(
     "NVIDIA_CHAT_URL",
@@ -38,14 +59,42 @@ NVIDIA_MISTRAL_429_RETRIES = int(os.getenv("NVIDIA_MISTRAL_429_RETRIES", "3"))
 
 _last_nvidia_call = 0.0
 
-MISTRAL_SYSTEM = """You are Mistral-Nemotron in Brockston Studio — The Christman AI Project IDE.
+MISTRAL_SYSTEM = """You are Mistral in Brockston Studio — The Christman AI Project IDE.
 Everett Christman is your partner. You reason carefully about architecture, trade-offs,
 and complex engineering decisions. Be direct, structured, and honest.
 You see workspace context from the IDE. Never use generic AI disclaimers."""
 
 
 def _mistral_key() -> str:
+    """NVIDIA-hosted Mistral-Nemotron key (fallback path)."""
     return mistral_nvidia_key()
+
+
+def _direct_mistral_key() -> str:
+    """Mistral's own API key, from the key drop box (env as fallback)."""
+    return _box_get("MISTRAL_API_KEY")
+
+
+def build_direct_request(system: str, user_content: str, key: str) -> Dict[str, Any]:
+    """The exact request sent to Mistral's API (kept separate so it can be checked)."""
+    return {
+        "url": MISTRAL_CHAT_URL,
+        "headers": {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        "json": {
+            "model": MISTRAL_MODEL,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user_content},
+            ],
+            "max_tokens": MISTRAL_MAX_TOKENS,
+            "temperature": MISTRAL_TEMPERATURE,
+            "stream": False,
+        },
+    }
 
 
 def _throttle_nvidia() -> None:
@@ -73,10 +122,29 @@ class MistralService:
         return True
 
     @property
+    def uses_direct(self) -> bool:
+        """True when the key box (or env) has Mistral's own API key."""
+        return bool(_direct_mistral_key())
+
+    @property
     def uses_nvidia(self) -> bool:
-        return bool(_mistral_key())
+        """NVIDIA fallback is used only when there is no direct Mistral key."""
+        return not self.uses_direct and bool(_mistral_key())
+
+    @property
+    def has_any_key(self) -> bool:
+        return self.uses_direct or bool(_mistral_key())
 
     def wiring_info(self) -> Dict[str, Any]:
+        if self.uses_direct:
+            return {
+                "backend": "mistral",
+                "model": MISTRAL_MODEL,
+                "label": f"{MISTRAL_MODEL} (Mistral API)",
+                "url": MISTRAL_CHAT_URL.rsplit("/v1", 1)[0] + "/v1",
+                "api_key_env": "MISTRAL_API_KEY",
+                "api_key_set": True,
+            }
         if self.uses_nvidia:
             return {
                 "backend": "nvidia",
@@ -88,10 +156,10 @@ class MistralService:
                 "reasoning_effort": NVIDIA_MISTRAL_REASONING_EFFORT or "off",
             }
         return {
-            "backend": "ollama",
-            "model": LLM_MODEL_GENERAL,
-            "label": f"{LLM_MODEL_GENERAL} (local Ollama fallback)",
-            "api_key_env": "NVIDIA_MISTRAL_API_KEY",
+            "backend": "none",
+            "model": MISTRAL_MODEL,
+            "label": "no Mistral key (paste one in Settings → Key drop box)",
+            "api_key_env": "MISTRAL_API_KEY",
             "api_key_set": False,
         }
 
@@ -101,13 +169,52 @@ class MistralService:
         if context:
             system = f"{system}\n\n{context}"
 
+        # 1. Mistral's own API. If it fails, say so; never pass someone else off as Mistral.
+        if self.uses_direct:
+            return self._call_direct(system=system, user_content=prompt)
+
+        # 2. No Mistral key in the box: NVIDIA-hosted Mistral-Nemotron, labelled.
         if self.uses_nvidia:
             try:
-                return self._call_nvidia(system=system, user_content=prompt)
+                reply = self._call_nvidia(system=system, user_content=prompt)
+                return f"{NVIDIA_FALLBACK_NOTE}\n\n{reply}"
             except Exception as exc:
-                logger.warning("[Mistral] NVIDIA failed (%s) — falling back to Ollama", exc)
+                logger.warning("[Mistral] NVIDIA fallback failed (%s) — local Ollama", exc)
+                reply = get_ai_response(prompt, system=system, target="ollama", model=LLM_MODEL_GENERAL)
+                return (
+                    f"(No Mistral key in the key box, and Mistral-Nemotron on NVIDIA failed: {exc}. "
+                    f"This answer came from local {LLM_MODEL_GENERAL}.)\n\n{reply}"
+                )
 
-        return get_ai_response(prompt, system=system, target="ollama", model=LLM_MODEL_GENERAL)
+        # 3. No key at all.
+        return NO_MISTRAL_KEY_MESSAGE
+
+    def _call_direct(self, *, system: str, user_content: str) -> str:
+        key = _direct_mistral_key()
+        if not key:
+            return NO_MISTRAL_KEY_MESSAGE
+        req = build_direct_request(system, user_content, key)
+        try:
+            r = httpx.post(req["url"], headers=req["headers"], json=req["json"], timeout=MISTRAL_TIMEOUT)
+        except httpx.TimeoutException:
+            return f"Mistral didn't answer within {MISTRAL_TIMEOUT:.0f} seconds. Try again."
+        except httpx.HTTPError as exc:
+            return f"Couldn't reach Mistral ({type(exc).__name__}). Check the internet connection."
+        if r.status_code in (401, 403):
+            return "Mistral turned down the key in the key box (it may be wrong or expired). Paste a fresh one in Settings → Key drop box → Mistral."
+        if r.status_code == 429:
+            return "Mistral says it's rate limited right now. Try again in a minute."
+        if r.status_code >= 400:
+            logger.error("[Mistral] API %s: %s", r.status_code, r.text[:300])
+            return f"Mistral returned an error ({r.status_code}): {r.text[:200]}"
+        data = r.json()
+        choices = data.get("choices") or []
+        if not choices:
+            return "Mistral sent back an empty answer."
+        content = (choices[0].get("message") or {}).get("content") or ""
+        if isinstance(content, list):  # newer models can return content chunks
+            content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+        return content.strip()
 
     def _build_payload(self, messages: List[Dict[str, str]], *, use_reasoning: bool) -> Dict[str, Any]:
         # Match NVIDIA docs for mistralai/mistral-nemotron
