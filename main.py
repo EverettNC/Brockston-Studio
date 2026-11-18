@@ -3,6 +3,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Key drop box (Settings panel) wins over .env; .env stays as the fallback.
+from backend import key_box
+key_box.apply_to_environ()
+
 import subprocess
 import pty
 import select
@@ -781,7 +785,7 @@ async def kimi_endpoint(request: KimiRequest):
     if not _kimi_svc or not _kimi_svc.is_available:
         raise fastapi.HTTPException(
             status_code=503,
-            detail="Kimi not available — set NVIDIA_KIMI_API_KEY in .env",
+            detail="Kimi not available — paste a Kimi key in Settings → Key drop box (NVIDIA_KIMI_API_KEY)",
         )
     try:
         from backend.being_agent import (
@@ -1538,6 +1542,49 @@ async def ide_command_endpoint(request: IdeCommandRequest):
 
     # Unknown action — fail loud (Rule 6)
     raise fastapi.HTTPException(status_code=400, detail=f"Unknown IDE command: {action}")
+
+# ==========================================
+# KEY DROP BOX — paste / edit / clear provider keys from Settings
+# Stored on this Mac only (see backend/key_box.py). Reads are masked.
+# ==========================================
+_LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+def _require_local(request: fastapi.Request) -> None:
+    host = request.client.host if request.client else ""
+    if host not in _LOCAL_HOSTS:
+        raise fastapi.HTTPException(status_code=403, detail="Key box is only reachable from this Mac")
+
+
+class KeyValue(BaseModel):
+    value: str
+
+
+@app.get("/api/keys")
+async def keys_list(request: fastapi.Request):
+    _require_local(request)
+    return {"path": str(key_box.box_path()), "providers": key_box.describe()}
+
+
+@app.put("/api/keys/{name}")
+async def keys_set(name: str, body: KeyValue, request: fastapi.Request):
+    _require_local(request)
+    if not key_box.is_slot(name):
+        raise fastapi.HTTPException(status_code=404, detail=f"No key slot named {name}")
+    key_box.set_value(name, body.value)
+    logger.info(f"Key box: {name} saved")
+    return {"ok": True, "providers": key_box.describe()}
+
+
+@app.delete("/api/keys/{name}")
+async def keys_clear(name: str, request: fastapi.Request):
+    _require_local(request)
+    if not key_box.is_slot(name):
+        raise fastapi.HTTPException(status_code=404, detail=f"No key slot named {name}")
+    key_box.clear(name)
+    logger.info(f"Key box: {name} cleared")
+    return {"ok": True, "providers": key_box.describe()}
+
 
 # ==========================================
 # FRONTEND SERVING

@@ -1,17 +1,23 @@
 """
 Per-being NVIDIA API keys — Nemo/Nemotron, Mistral, Kimi, Gemma each use their own nvapi key.
 Falls back to legacy NVIDIA_API_KEY only when a being-specific key is unset.
+
+Each name is looked up in the Studio key drop box first (Settings panel),
+then in the environment.
 """
 
 from __future__ import annotations
 
-import os
+try:
+    from .key_box import get as _box_get
+except ImportError:  # backend/ on sys.path (launcher)
+    from key_box import get as _box_get
 
 
 def resolve_nvidia_key(*env_names: str) -> str:
-    """Return the first non-empty key from env_names."""
+    """Return the first non-empty key from env_names (box first, then environment)."""
     for name in env_names:
-        value = os.getenv(name, "").strip()
+        value = _box_get(name)
         if value:
             return value
     return ""
