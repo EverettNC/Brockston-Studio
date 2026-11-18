@@ -46,7 +46,7 @@ PROVIDERS: List[dict] = [
         "id": "mistral",
         "label": "Mistral",
         "slots": [
-            {"env": "MISTRAL_API_KEY", "label": "Mistral API key", "secret": True},
+            {"env": "MISTRAL_API_KEY", "label": "Mistral API key (the Mistral button uses this)", "secret": True},
         ],
     },
     {

@@ -256,12 +256,12 @@ async def health_check():
                 "api_key_set": bool(_nemo_svc and _nemo_svc.api_key_configured),
             },
             "mistral": {
-                "name": "Mistral-Nemotron",
+                "name": "Mistral",
                 "backend": mistral_wiring.get("backend", "offline"),
                 "model": mistral_wiring.get("model", NVIDIA_MISTRAL_MODEL),
                 "label": mistral_wiring.get("label", "unavailable"),
-                "api_key_env": "NVIDIA_MISTRAL_API_KEY",
-                "api_key_set": bool(_mistral_svc and _mistral_svc.uses_nvidia),
+                "api_key_env": mistral_wiring.get("api_key_env", "MISTRAL_API_KEY"),
+                "api_key_set": bool(_mistral_svc and _mistral_svc.has_any_key),
             },
             "kimi26": {
                 "name": "Kimi · NVIDIA K2.6",
@@ -745,10 +745,11 @@ async def nemoclaw_endpoint(request: NemoClawRequest):
 
 @app.post("/api/mistral")
 async def mistral_endpoint(request: MistralRequest):
-    """Mistral-Nemotron — deep reasoning instructor (NVIDIA NIM)."""
-    logger.info("Mistral-Nemotron request: %s", request.message[:120])
+    """Mistral button — Mistral's own API with the key-box key; NVIDIA Mistral-Nemotron
+    only when the box has no Mistral key (the answer says so)."""
+    logger.info("Mistral request: %s", request.message[:120])
     if not _mistral_svc:
-        raise fastapi.HTTPException(status_code=503, detail="Mistral-Nemotron service not available")
+        raise fastapi.HTTPException(status_code=503, detail="Mistral service not available")
     try:
         from backend.being_context import build_being_context, extract_project_root_path
 
